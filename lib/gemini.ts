@@ -1,4 +1,4 @@
-import { GoogleGenAI, type Part } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel, type Part } from "@google/genai";
 
 export const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
 
@@ -13,6 +13,8 @@ export async function generateJson(system: string, parts: Part[], jsonSchema: un
       responseMimeType: "application/json",
       responseJsonSchema: jsonSchema,
       maxOutputTokens: 8192,
+      // Default (medium) thinking ran past the 55s budget on a 6-item menu; low keeps it inside.
+      thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
       abortSignal: AbortSignal.timeout(timeoutMs),
     },
   });
