@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ChangeEvent } from "react";
+import { askKo } from "@/lib/ask";
 import { compressImage } from "@/lib/image";
 import { STRINGS, VENDOR_KO, type Answer, type ErrorCode, type Strings } from "@/lib/i18n";
 import { shareResults } from "@/lib/share";
@@ -391,7 +392,13 @@ function Results({
             mode={run.mode}
             hasAllergy={hasAllergy}
             onVendor={() =>
-              onVendor({ title: it.name_ko, ko: it.ask_ko, local: it.ask, restrictions: run.restrictions, answerable: true })
+              onVendor({
+                title: it.name_ko,
+                ko: askKo(it.name_ko, it.ask_about.map((a) => a.ko)),
+                local: t.askLocal(it.name, it.ask_about.map((a) => a.local)),
+                restrictions: run.restrictions,
+                answerable: true,
+              })
             }
           />
         ))}

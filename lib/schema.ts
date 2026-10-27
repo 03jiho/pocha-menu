@@ -27,8 +27,9 @@ export const ItemSchema = z.object({
   confidence: z.enum(["high", "medium", "low"]),
   reason: z.string(), // in the user's language
   triggered_restrictions: z.array(z.enum(RESTRICTIONS)),
-  ask_ko: z.string(), // always Korean, shown to the vendor; yes/no question where "yes" = it contains it
-  ask: z.string(), // the same question in the user's language, so they know what they are asking
+  // What to ask the vendor about. The app builds the question from a fixed template ("X에 A나 B가 들어가나요?")
+  // so "네" always means "it contains it" — the model never writes the question itself.
+  ask_about: z.array(z.object({ ko: z.string(), local: z.string() })),
 });
 
 export const ResultSchema = z.object({

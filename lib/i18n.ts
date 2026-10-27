@@ -41,6 +41,11 @@ const en = {
   askAll: "Ask about the whole menu",
   vendorLead: "Show this screen to the vendor",
   youAsk: "You're asking:",
+  // Mirrors askKo() in lib/ask.ts, so the translation always says the same thing as the Korean question.
+  askLocal: (menu: string, items: string[]) =>
+    items.length
+      ? `Does "${menu}" contain ${items.join(" or ")}?`
+      : `Does "${menu}" contain any of the ingredients listed above?`,
   dietCardAsk: "Does this food contain any of these?",
   close: "Close",
   vendorSays: "The vendor says:",
@@ -128,6 +133,8 @@ const ja: Strings = {
   askAll: "メニュー全体についてまとめて聞く",
   vendorLead: "この画面をお店の人に見せてください",
   youAsk: "質問の内容：",
+  askLocal: (menu, items) =>
+    items.length ? `${menu}に${items.join("や")}は入っていますか？` : `${menu}に上記の食材は入っていますか？`,
   dietCardAsk: "この料理にこれらは入っていますか？",
   close: "閉じる",
   vendorSays: "お店の人の答え：",
@@ -207,6 +214,7 @@ const zh: Strings = {
   askAll: "一次询问整份菜单",
   vendorLead: "请把这个画面给摊主看",
   youAsk: "你在问：",
+  askLocal: (menu, items) => (items.length ? `${menu}里有${items.join("或")}吗？` : `${menu}里有上面列出的食材吗？`),
   dietCardAsk: "这道菜里有这些吗？",
   close: "关闭",
   vendorSays: "摊主的回答：",
@@ -286,6 +294,8 @@ const ar: Strings = {
   askAll: "اسأل عن القائمة كلها",
   vendorLead: "اعرض هذه الشاشة على البائع",
   youAsk: "سؤالك:",
+  askLocal: (menu, items) =>
+    items.length ? `هل يحتوي ${menu} على ${items.join(" أو ")}؟` : `هل يحتوي ${menu} على أي من المكونات المذكورة أعلاه؟`,
   dietCardAsk: "هل يحتوي هذا الطعام على أيٍّ من هذه؟",
   close: "إغلاق",
   vendorSays: "جواب البائع:",
@@ -331,7 +341,7 @@ const ar: Strings = {
 export const STRINGS: Record<Lang, Strings> = { en, ja, zh, ar };
 
 // Vendor-facing Korean (fixed text, not AI): greeting + one plain statement per restriction + answer buttons.
-// "네" always means "it contains it", matching how ask_ko is phrased.
+// "네" always means "it contains it", matching the askKo() template in lib/ask.ts.
 export const VENDOR_KO = {
   greeting: "안녕하세요! 저는 외국인 여행객이에요.",
   pleaseAnswer: "아래에서 답을 눌러 주세요 🙏",

@@ -85,6 +85,8 @@ lib/sample.ts             샘플 데모 결과 (MOCK_MODE도 이것을 반환) +
 lib/share.ts              결과를 캔버스 이미지로 그려 공유/다운로드
 tests/menu-cases.json     대표 메뉴 30개 × 기준별 기대 판정
 tests/eval.mts            프롬프트 자동 채점 스크립트
+tests/ask.test.mts        상인 질문 템플릿·조사 검사 (node tests/ask.test.mts)
+lib/ask.ts                상인 질문을 고정 틀로 생성("…들어가나요?" → 네 = 들어감 보장)
 ```
 
 ## 안전 설계와 한계

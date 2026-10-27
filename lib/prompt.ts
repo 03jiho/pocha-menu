@@ -8,9 +8,8 @@ const COMMON_RULES = `공통 규칙:
 - likely_ingredients의 각 항목은 "사용자 언어 (한국어)" 형식으로 쓴다. 괄호 앞은 반드시 사용자 언어(영어가 아닐 수 있음). 사용자는 한국어를 못 읽는다.
 - name은 사용자 언어로 된 짧은 음식 설명이다. 한국어 이름은 name_ko에만 쓴다.
 - flagged_ingredients: likely_ingredients 중 선택된 기준에 걸리는 항목만, likely_ingredients와 글자 하나까지 똑같은 문자열로.
-- name, reason, notes, ask, ask_all은 지정된 사용자 언어로 쓴다. reason은 1~2문장으로 짧게.
-- ask_ko는 상인(또는 점원)에게 그대로 보여줄 짧고 공손한 한국어 예/아니오 질문 한 문장. 상인이 "네"라고 답하면 "그 재료가 들어간다"는 뜻이 되도록 묻는다. 선택된 기준에 맞춘다. 예: "새우나 게가 들어가나요?", "육수에 돼지고기 쓰시나요?", "양념에 맛술이나 술이 들어가나요?" ("안 들어가죠?"처럼 부정형으로 묻지 않는다.)
-- ask는 ask_ko를 사용자 언어로 옮긴 것.
+- name, reason, notes, ask_all은 지정된 사용자 언어로 쓴다. reason은 1~2문장으로 짧게.
+- ask_about: 이 메뉴에 대해 상인에게 "들어가나요?"라고 확인할 재료 1~3개. 질문 문장은 앱이 만들므로 재료만 준다. ko는 조사 없는 한국어 명사(예: "돼지고기", "새우", "맛술", "돼지기름"), local은 같은 재료의 사용자 언어 이름. 선택된 기준에 걸릴 수 있는 재료만 넣는다.
 - ask_all_ko는 여러 메뉴를 한 번에 물어보는 짧고 공손한 한국어 한 문장. 예: "새우나 게가 안 들어간 메뉴가 뭐예요?", "돼지고기 안 들어간 메뉴가 뭐예요?" ask_all은 그것을 사용자 언어로 옮긴 것.
 - 할랄 기준: 돼지고기와 그 파생물(돼지기름, 젤라틴, 돼지뼈 육수), 술(맛술, 미림, 청주, 소주, 와인 — 고기 잡내 제거나 양념에 흔함)은 해당. 소·닭 등 고기는 할랄 도축 여부를 사진으로 알 수 없으므로 최소 "ask". 해산물·채소만 들어간 음식도 맛술·돼지기름 가능성이 있으면 "ask". 할랄 "인증"이라고 절대 말하지 않는다.
 - 채식(vegetarian) 기준: 고기·생선·해산물과 그 육수·젓갈·액젓은 해당, 달걀·유제품·꿀은 허용.
@@ -105,5 +104,5 @@ const RESTRICTION_DESC: Record<Restriction, string> = {
 };
 
 export function userPrompt(restrictions: Restriction[], lang: Lang) {
-  return `Selected dietary restrictions:\n${restrictions.map((r) => `- ${r}: ${RESTRICTION_DESC[r]}`).join("\n")}\n\nUser language (for name, reason, notes, ask, ask_all, and the part of each ingredient before the parentheses): ${LANG_NAME[lang]}. Example in this language: ${LANG_EXAMPLE[lang]}. ask_ko and ask_all_ko stay Korean. Use only the ids above in triggered_restrictions.`;
+  return `Selected dietary restrictions:\n${restrictions.map((r) => `- ${r}: ${RESTRICTION_DESC[r]}`).join("\n")}\n\nUser language (for name, reason, notes, ask_all, ask_about[].local, and the part of each ingredient before the parentheses): ${LANG_NAME[lang]}. Example in this language: ${LANG_EXAMPLE[lang]}. ask_about[].ko and ask_all_ko stay Korean. Use only the ids above in triggered_restrictions.`;
 }
