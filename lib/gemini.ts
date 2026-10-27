@@ -1,20 +1,29 @@
 import { GoogleGenAI, ThinkingLevel, type Part } from "@google/genai";
 
 export const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
+// Used for the retry: free-tier flash models often return 503 "high demand"; the lite model answered in <1s then.
+export const GEMINI_FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || "gemini-3.5-flash-lite";
 
 // One structured-output call. Returns the parsed JSON; the caller validates it with zod.
-export async function generateJson(system: string, parts: Part[], jsonSchema: unknown, timeoutMs: number) {
+export async function generateJson(
+  system: string,
+  parts: Part[],
+  jsonSchema: unknown,
+  timeoutMs: number,
+  model = GEMINI_MODEL,
+) {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   const res = await ai.models.generateContent({
-    model: GEMINI_MODEL,
+    model,
     contents: [{ role: "user", parts }],
     config: {
       systemInstruction: system,
       responseMimeType: "application/json",
       responseJsonSchema: jsonSchema,
       maxOutputTokens: 8192,
-      // Low thinking keeps latency well inside the 55s route budget.
-      thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+      // Low thinking keeps latency well inside the 55s route budget. Only set for the main model: the docs list
+      // supported levels per model, and the lite fallback isn't on that list.
+      ...(model === GEMINI_MODEL && { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }),
       abortSignal: AbortSignal.timeout(timeoutMs),
       // SDK default is 5 attempts with backoff on 408/429/5xx, which burned the whole budget and hid
       // the real status behind an AbortError. The route retries once itself.

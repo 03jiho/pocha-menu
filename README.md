@@ -38,6 +38,7 @@ npm run dev                  # http://localhost:3000
 |---|---|---|
 | `GEMINI_API_KEY` | 실제 호출 시 | 서버(API route)에서만 사용. `NEXT_PUBLIC_` 붙이지 말 것. 없으면 API가 `server_misconfigured`(500)를 반환하고 화면에 "The service isn't set up yet. Try the sample menu instead." 표시 |
 | `GEMINI_MODEL` | 아니오 | 기본값 `gemini-3.6-flash` (무료 티어). `gemini-3.8-flash`는 2026-10-27 기준 과부하(503·무응답)가 잦아 제외, 더 빠른 대안은 `gemini-3.5-flash-lite` |
+| `GEMINI_FALLBACK_MODEL` | 아니오 | 기본값 `gemini-3.5-flash-lite`. 첫 시도가 실패(과부하 503 등)하면 재시도는 이 가벼운 모델로 보냄 |
 | `MOCK_MODE` | 아니오 | `true`면 샘플 JSON 반환 (Gemini 호출 안 함) |
 
 `.env.local`은 `.gitignore`에 포함됨. 실제 키는 커밋하지 말 것.
