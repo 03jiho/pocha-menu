@@ -9,7 +9,10 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { GEMINI_MODEL, generateJson } from "../lib/gemini.ts";
 import { SYSTEM_PROMPTS, userPrompt } from "../lib/prompt.ts";
-import { RESTRICTIONS, RESULT_JSON_SCHEMA, ResultSchema, type Restriction, type Verdict } from "../lib/schema.ts";
+import { RESULT_JSON_SCHEMA, ResultSchema, type Restriction, type Verdict } from "../lib/schema.ts";
+
+// Only restrictions that menu-cases.json has expectations for (halal/vegetarian/soy/sesame are not labeled yet).
+const EVAL_RESTRICTIONS: Restriction[] = ["pork", "beef", "crustacean", "nuts", "egg", "dairy", "wheat", "fish", "vegan"];
 
 type Case = { menu: string; avoid: Restriction[]; ask: Restriction[] };
 const cases: Case[] = JSON.parse(readFileSync(new URL("./menu-cases.json", import.meta.url), "utf8"));
@@ -23,7 +26,7 @@ const rows: string[] = [];
 const failures: string[] = [];
 let pass = 0, total = 0, forbidden = 0;
 
-for (const r of only ? [only] : RESTRICTIONS) {
+for (const r of only ? [only] : EVAL_RESTRICTIONS) {
   const text = `메뉴판 글자 (사진 대신 텍스트로 제공):\n${cases.map((c) => c.menu).join("\n")}\n\n${userPrompt([r], "en")}`;
   const parsed = ResultSchema.safeParse(await generateJson(SYSTEM_PROMPTS.menu, [{ text }], RESULT_JSON_SCHEMA, 120_000));
   const items = parsed.success ? parsed.data.items : [];

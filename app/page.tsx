@@ -2,12 +2,15 @@
 
 import { useEffect, useState, type ChangeEvent } from "react";
 import { compressImage } from "@/lib/image";
-import { STRINGS, type ErrorCode, type Strings } from "@/lib/i18n";
+import { STRINGS, VENDOR_KO, type Answer, type ErrorCode, type Strings } from "@/lib/i18n";
 import { shareResults } from "@/lib/share";
 import { SAMPLE_IMAGE, SAMPLE_RESTRICTIONS, SAMPLE_RESULT } from "@/lib/sample";
 import {
+  ALLERGIES,
   ALLERGY,
+  DIETS,
   LANGS,
+  MODES,
   RESTRICTIONS,
   VERDICTS,
   type AnalyzeResult,
@@ -24,7 +27,8 @@ type State =
   | { kind: "loading" }
   | { kind: "done"; result: AnalyzeResult; run: Run }
   | { kind: "error"; code: ErrorCode; detail?: string };
-type VendorText = { title?: string; text: string };
+// What the vendor screen shows: a Korean question (+ its translation), or just the diet card.
+type VendorAsk = { title?: string; ko: string; local?: string; restrictions: Restriction[]; answerable: boolean };
 
 const VERDICT_STYLE: Record<Verdict, string> = {
   ok: "bg-green-700 text-white",
@@ -34,9 +38,34 @@ const VERDICT_STYLE: Record<Verdict, string> = {
 const VERDICT_ICON: Record<Verdict, string> = { ok: "✓", ask: "?", avoid: "✕" };
 const RISK: Record<Verdict, number> = { avoid: 0, ask: 1, ok: 2 };
 const NO_RETRY: ErrorCode[] = ["bad_image", "too_large", "server_misconfigured"];
+const ANSWER_STYLE: Record<Answer, string> = {
+  yes: "bg-red-700 text-white",
+  no: "bg-green-700 text-white",
+  unsure: "bg-yellow-300 text-black",
+};
+const ANSWER_ICON: Record<Answer, string> = { yes: "✕", no: "✓", unsure: "?" };
 
 const bigBtn =
   "flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-lg font-semibold min-h-14 cursor-pointer";
+
+// Per-viewer conveniences only; the app works without storage.
+function load<T>(key: string, ok: (v: unknown) => v is T): T | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(key) ?? "null");
+    return ok(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+function save(key: string, value: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {}
+}
+const isLang = (v: unknown): v is Lang => (LANGS as readonly unknown[]).includes(v);
+const isMode = (v: unknown): v is Mode => (MODES as readonly unknown[]).includes(v);
+const isRestrictions = (v: unknown): v is Restriction[] =>
+  Array.isArray(v) && v.every((r) => (RESTRICTIONS as readonly unknown[]).includes(r));
 
 export default function Home() {
   const [lang, setLang] = useState<Lang>("en");
@@ -44,27 +73,29 @@ export default function Home() {
   const [selected, setSelected] = useState<Restriction[]>([]);
   const [photo, setPhoto] = useState<string | null>(null); // base64 JPEG, kept only in memory for retry
   const [state, setState] = useState<State>({ kind: "idle" });
-  const [vendor, setVendor] = useState<VendorText | null>(null);
+  const [vendor, setVendor] = useState<VendorAsk | null>(null);
+  const [hydrated, setHydrated] = useState(false);
   const t = STRINGS[lang];
 
-  // Pick the saved or browser language after mount (the page is prerendered in English).
+  // Restore language, mode and restrictions after mount (the page is prerendered in English).
   useEffect(() => {
-    let saved: string | null = null;
-    try {
-      saved = localStorage.getItem("lang");
-    } catch {}
-    const guess = saved ?? navigator.language.slice(0, 2);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if ((LANGS as readonly string[]).includes(guess)) setLang(guess as Lang);
+    const browser = navigator.language.slice(0, 2);
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setLang(load("lang", isLang) ?? (isLang(browser) ? browser : "en"));
+    setMode(load("mode", isMode) ?? "menu");
+    setSelected(load("restrictions", isRestrictions) ?? []);
+    setHydrated(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
   useEffect(() => {
     document.documentElement.lang = lang;
     document.documentElement.dir = STRINGS[lang].dir;
-    try {
-      localStorage.setItem("lang", lang);
-    } catch {}
-  }, [lang]);
+    if (!hydrated) return;
+    save("lang", lang);
+    save("mode", mode);
+    save("restrictions", selected);
+  }, [lang, mode, selected, hydrated]);
 
   async function analyze(image: string) {
     const run: Run = { restrictions: selected, mode, sample: false };
@@ -106,16 +137,37 @@ export default function Home() {
   }
 
   function trySample() {
-    setSelected(SAMPLE_RESTRICTIONS);
-    setMode("menu");
     setPhoto(null);
     setState({ kind: "done", result: SAMPLE_RESULT, run: { restrictions: SAMPLE_RESTRICTIONS, mode: "menu", sample: true } });
     window.scrollTo(0, 0);
   }
 
+  const showDietCard = () =>
+    setVendor({ ko: VENDOR_KO.dietCardAsk, local: t.dietCardAsk, restrictions: selected, answerable: true });
   const toggle = (r: Restriction) =>
     setSelected((s) => (s.includes(r) ? s.filter((x) => x !== r) : [...s, r]));
   const ready = selected.length > 0;
+
+  const chips = (group: readonly Restriction[]) => (
+    <div className="mt-1 flex flex-wrap gap-2">
+      {group.map((r) => {
+        const on = selected.includes(r);
+        return (
+          <button
+            key={r}
+            aria-pressed={on}
+            onClick={() => toggle(r)}
+            className={`min-h-11 rounded-full border-2 px-3 text-base ${
+              on ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 bg-white"
+            }`}
+          >
+            {on ? "✓ " : ""}
+            {t.restrictions[r]}
+          </button>
+        );
+      })}
+    </div>
+  );
 
   return (
     <main className="mx-auto w-full max-w-md px-4 pb-16 pt-4">
@@ -148,7 +200,7 @@ export default function Home() {
           }}
         />
       ) : state.kind === "loading" ? (
-        <Loading t={t} />
+        <Loading t={t} photo={photo} />
       ) : (
         <>
           {state.kind === "error" && (
@@ -164,7 +216,7 @@ export default function Home() {
           )}
 
           <div className="mt-3 grid grid-cols-2 gap-1 rounded-2xl bg-neutral-200 p-1" role="group">
-            {(["menu", "label"] as const).map((m) => (
+            {MODES.map((m) => (
               <button
                 key={m}
                 aria-pressed={mode === m}
@@ -178,27 +230,14 @@ export default function Home() {
 
           <fieldset className="mt-3">
             <legend className="text-lg font-bold">{t.restrictionsTitle}</legend>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {RESTRICTIONS.map((r) => {
-                const on = selected.includes(r);
-                return (
-                  <button
-                    key={r}
-                    aria-pressed={on}
-                    onClick={() => toggle(r)}
-                    className={`min-h-11 rounded-full border-2 px-3 text-base ${
-                      on ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 bg-white"
-                    }`}
-                  >
-                    {on ? "✓ " : ""}
-                    {t.restrictions[r]}
-                  </button>
-                );
-              })}
-            </div>
+            <p className="mt-1 text-sm font-semibold text-neutral-600">{t.groupDiet}</p>
+            {chips(DIETS)}
+            <p className="mt-2 text-sm font-semibold text-neutral-600">{t.groupAllergy}</p>
+            {chips(ALLERGIES)}
+            {ready && <p className="mt-1 text-xs text-neutral-600">💾 {t.saved}</p>}
           </fieldset>
 
-          <section className="mt-4 grid gap-2">
+          <section className="mt-3 grid gap-2">
             {!ready && <p className="font-semibold text-amber-800">↑ {t.restrictionsHint}</p>}
             <label
               aria-disabled={!ready}
@@ -219,25 +258,39 @@ export default function Home() {
                 ✨ {t.trySample}
               </button>
             </div>
+            {ready && (
+              <button onClick={showDietCard} className={`${bigBtn} border-2 border-neutral-900 bg-amber-50`}>
+                🪪 {t.dietCard}
+              </button>
+            )}
             <p className="text-sm text-neutral-700">📸 {t.uploadHint[mode]}</p>
             <p className="text-sm text-neutral-700">🔒 {t.privacy}</p>
           </section>
         </>
       )}
 
-      {vendor && <VendorModal t={t} vendor={vendor} onClose={() => setVendor(null)} />}
+      {vendor && <VendorScreen t={t} ask={vendor} onClose={() => setVendor(null)} />}
     </main>
   );
 }
 
-function Loading({ t }: { t: Strings }) {
+function Loading({ t, photo }: { t: Strings; photo: string | null }) {
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setStep((s) => Math.min(s + 1, t.analyzingSteps.length - 1)), 3000);
+    return () => clearInterval(id);
+  }, [t]);
   return (
     <div className="mt-6" aria-busy="true">
-      <p className="text-lg font-semibold" role="status">
-        {t.analyzing}
+      {photo && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={`data:image/jpeg;base64,${photo}`} alt="" className="mx-auto max-h-40 rounded-xl opacity-80" />
+      )}
+      <p className="mt-4 text-lg font-semibold" role="status">
+        ⏳ {t.analyzingSteps[step]}
       </p>
-      {[0, 1, 2].map((i) => (
-        <div key={i} className="mt-4 h-36 animate-pulse rounded-2xl bg-neutral-200" />
+      {[0, 1].map((i) => (
+        <div key={i} className="mt-4 h-28 animate-pulse rounded-2xl bg-neutral-200" />
       ))}
     </div>
   );
@@ -253,7 +306,7 @@ function Results({
   t: Strings;
   result: AnalyzeResult;
   run: Run;
-  onVendor: (v: VendorText) => void;
+  onVendor: (v: VendorAsk) => void;
   onReset: () => void;
 }) {
   const [filter, setFilter] = useState<Verdict | "all">("all");
@@ -268,7 +321,7 @@ function Results({
 
   return (
     <section className="mt-3">
-      <p className="sticky top-0 z-10 rounded-xl border-2 border-neutral-900 bg-yellow-100 p-3 font-semibold">
+      <p className="rounded-xl border-2 border-neutral-900 bg-yellow-100 px-3 py-2 text-sm font-semibold">
         ⚠️ {t.disclaimer}
       </p>
 
@@ -304,7 +357,9 @@ function Results({
 
       {result.ask_all_ko && run.mode === "menu" && (
         <button
-          onClick={() => onVendor({ text: result.ask_all_ko })}
+          onClick={() =>
+            onVendor({ ko: result.ask_all_ko, local: result.ask_all, restrictions: run.restrictions, answerable: false })
+          }
           className={`${bigBtn} mt-3 bg-neutral-900 text-white`}
         >
           🗣️ {t.askAll}
@@ -335,7 +390,9 @@ function Results({
             it={it}
             mode={run.mode}
             hasAllergy={hasAllergy}
-            onVendor={() => onVendor({ title: it.name_ko, text: it.ask_ko })}
+            onVendor={() =>
+              onVendor({ title: it.name_ko, ko: it.ask_ko, local: it.ask, restrictions: run.restrictions, answerable: true })
+            }
           />
         ))}
       </ul>
@@ -385,7 +442,7 @@ function Card({
       <p className="mt-2">{it.reason}</p>
 
       <p className="mt-3 text-sm font-semibold">{mode === "label" ? t.labelIngredients : t.likelyIngredients}</p>
-      <ul className="mt-1 flex flex-wrap gap-1" lang="ko">
+      <ul className="mt-1 flex flex-wrap gap-1">
         {it.likely_ingredients.map((ing, j) => {
           const hit = it.flagged_ingredients.includes(ing);
           return (
@@ -415,28 +472,75 @@ function Card({
   );
 }
 
-function VendorModal({ t, vendor, onClose }: { t: Strings; vendor: VendorText; onClose: () => void }) {
+// Full-screen, high-contrast. Top: Korean for the vendor (who they are talking to, what they can't eat, the question,
+// tap-to-answer buttons). After a tap: the answer in the traveler's language.
+function VendorScreen({ t, ask, onClose }: { t: Strings; ask: VendorAsk; onClose: () => void }) {
+  const [answer, setAnswer] = useState<Answer | null>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  // The whole screen is one button: a single tap anywhere closes it.
   return (
-    <button
-      autoFocus
-      onClick={onClose}
-      aria-label={t.tapToClose}
-      className="fixed inset-0 z-50 flex flex-col bg-white p-6 text-start text-black"
-    >
-      <span className="text-base text-neutral-600">
-        {t.vendorLead} · {t.tapToClose}
-      </span>
-      <span className="flex flex-1 flex-col justify-center" lang="ko" dir="ltr">
-        {vendor.title && <span className="text-3xl font-semibold">{vendor.title}</span>}
-        <span className="mt-4 text-5xl font-bold leading-tight break-keep">{vendor.text}</span>
-      </span>
-    </button>
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 overflow-y-auto bg-white text-black">
+      <div className="mx-auto flex min-h-full max-w-xl flex-col p-5">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-neutral-600">{answer ? t.vendorSays : t.vendorLead}</p>
+          <button autoFocus onClick={onClose} className="min-h-12 shrink-0 rounded-xl bg-neutral-900 px-4 text-lg font-semibold text-white">
+            ✕ {t.close}
+          </button>
+        </div>
+
+        {answer ? (
+          <div className="flex flex-1 flex-col justify-center">
+            <p className={`rounded-2xl p-6 text-3xl font-bold ${ANSWER_STYLE[answer]}`}>
+              {ANSWER_ICON[answer]} {t.answer[answer]}
+            </p>
+            <p className="mt-4 text-lg">{t.answerAdvice[answer]}</p>
+            {ask.local && (
+              <p className="mt-4 text-sm text-neutral-600">
+                {t.youAsk} {ask.local}
+              </p>
+            )}
+            <button onClick={() => setAnswer(null)} className={`${bigBtn} mt-6 border-2 border-neutral-900`}>
+              ↺ {t.askAgain}
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="mt-6 flex-1" lang="ko" dir="ltr">
+              <p className="text-xl font-semibold">{VENDOR_KO.greeting}</p>
+              {ask.restrictions.length > 0 && (
+                <ul className="mt-3 grid gap-1 text-xl">
+                  {ask.restrictions.map((r) => (
+                    <li key={r}>• {VENDOR_KO.statements[r]}</li>
+                  ))}
+                </ul>
+              )}
+              {ask.title && <p className="mt-6 text-2xl font-semibold text-neutral-700">{ask.title}</p>}
+              <p className="mt-2 text-4xl font-bold leading-tight break-keep">{ask.ko}</p>
+              {ask.answerable && (
+                <>
+                  <p className="mt-6 text-lg text-neutral-700">{VENDOR_KO.pleaseAnswer}</p>
+                  <div className="mt-2 grid gap-2">
+                    {(["yes", "no", "unsure"] as const).map((a) => (
+                      <button key={a} onClick={() => setAnswer(a)} className={`${bigBtn} text-2xl ${ANSWER_STYLE[a]}`}>
+                        {VENDOR_KO.answer[a]}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            {ask.local && (
+              <p className="mt-6 border-t pt-3 text-sm text-neutral-600">
+                {t.youAsk} {ask.local}
+              </p>
+            )}
+          </>
+        )}
+      </div>
+    </div>
   );
 }

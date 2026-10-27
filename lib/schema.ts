@@ -1,20 +1,13 @@
 import { z } from "zod";
 
-export const RESTRICTIONS = [
-  "pork",
-  "beef",
-  "crustacean",
-  "nuts",
-  "egg",
-  "dairy",
-  "wheat",
-  "fish",
-  "vegan",
-] as const;
+// Shown in two groups on the first screen; order here is display order.
+export const DIETS = ["halal", "vegetarian", "vegan", "pork", "beef"] as const;
+export const ALLERGIES = ["crustacean", "fish", "egg", "dairy", "wheat", "nuts", "soy", "sesame"] as const;
+export const RESTRICTIONS = [...DIETS, ...ALLERGIES] as const;
 export type Restriction = (typeof RESTRICTIONS)[number];
 
 // Allergy criteria: every card says "Always confirm with the vendor" (cross-contamination is never knowable from a photo).
-export const ALLERGY: readonly Restriction[] = ["crustacean", "nuts", "egg"];
+export const ALLERGY: readonly Restriction[] = ALLERGIES;
 
 export const LANGS = ["en", "ja", "zh", "ar"] as const;
 export type Lang = (typeof LANGS)[number];
@@ -28,19 +21,21 @@ export type Verdict = (typeof VERDICTS)[number];
 export const ItemSchema = z.object({
   name_ko: z.string(),
   name: z.string(), // in the user's language
-  likely_ingredients: z.array(z.string()), // Korean
-  flagged_ingredients: z.array(z.string()), // subset of likely_ingredients that hit a selected restriction
+  likely_ingredients: z.array(z.string()), // "user-language (한국어)", e.g. "egg (달걀)"
+  flagged_ingredients: z.array(z.string()), // exact subset of likely_ingredients that hit a selected restriction
   verdict: z.enum(VERDICTS),
   confidence: z.enum(["high", "medium", "low"]),
   reason: z.string(), // in the user's language
   triggered_restrictions: z.array(z.enum(RESTRICTIONS)),
-  ask_ko: z.string(), // always Korean, shown to the vendor
+  ask_ko: z.string(), // always Korean, shown to the vendor; yes/no question where "yes" = it contains it
+  ask: z.string(), // the same question in the user's language, so they know what they are asking
 });
 
 export const ResultSchema = z.object({
   readable: z.boolean(),
   items: z.array(ItemSchema),
   ask_all_ko: z.string(), // one Korean question covering the whole menu
+  ask_all: z.string(), // the same question in the user's language
   notes: z.string(), // general note, or why it was unreadable; "" if none
   label_contains: z.string(), // label mode: allergen statement as printed ("…함유"); "" otherwise
   label_facility: z.string(), // label mode: shared-facility statement as printed; "" otherwise

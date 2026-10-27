@@ -73,6 +73,7 @@ export async function POST(req: Request) {
       console.error(`analyze attempt ${attempt}: ${e.name} ${status ?? ""}`);
       if (e.name === "TimeoutError" || e.name === "AbortError") timedOut = true;
       if (status === 429) return fail("rate_limited", 429);
+      if (status === 503 && attempt === 2) return fail("busy", 503); // Gemini "high demand"
       if (status === 401 || status === 403) return fail("server_misconfigured", 500);
       if (status === 400) break; // includes an invalid key; retrying won't help
     }

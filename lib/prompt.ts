@@ -5,10 +5,14 @@ const COMMON_RULES = `공통 규칙:
 - verdict는 선택된 기준 전체를 합쳐 가장 조심스러운 쪽으로 정한다(avoid > ask > ok).
 - 갑각류/견과류/달걀 같은 알레르기 기준은 특히 보수적으로 판단한다. 알레르기 기준이 선택된 상태에서 "ok"를 낼 때는 reason에 교차오염 가능성은 확인할 수 없다는 문장을 넣는다.
 - triggered_restrictions: 선택된 기준 중 이 항목에 해당하거나 의심되는 것만.
-- flagged_ingredients: likely_ingredients 중 선택된 기준에 걸리는 재료만(같은 표기 그대로).
-- name, reason, notes는 지정된 사용자 언어로 쓴다. reason은 1~2문장으로 짧게.
-- ask_ko는 상인(또는 점원)에게 그대로 보여줄 짧고 공손한 한국어 한 문장. 선택된 기준에 맞춘다. 예: "새우나 게가 들어가나요?", "육수에 돼지고기 쓰시나요?"
-- ask_all_ko는 여러 메뉴를 한 번에 물어보는 짧고 공손한 한국어 한 문장. 예: "새우나 게가 들어간 메뉴가 있나요?", "돼지고기 안 들어간 메뉴가 뭐예요?"
+- likely_ingredients의 각 항목은 "사용자 언어 (한국어)" 형식으로 쓴다. 예(영어): "egg (달걀)", "anchovy broth (멸치 육수)". 사용자는 한국어를 못 읽는다.
+- flagged_ingredients: likely_ingredients 중 선택된 기준에 걸리는 항목만, likely_ingredients와 글자 하나까지 똑같은 문자열로.
+- name, reason, notes, ask, ask_all은 지정된 사용자 언어로 쓴다. reason은 1~2문장으로 짧게.
+- ask_ko는 상인(또는 점원)에게 그대로 보여줄 짧고 공손한 한국어 예/아니오 질문 한 문장. 상인이 "네"라고 답하면 "그 재료가 들어간다"는 뜻이 되도록 묻는다. 선택된 기준에 맞춘다. 예: "새우나 게가 들어가나요?", "육수에 돼지고기 쓰시나요?", "양념에 맛술이나 술이 들어가나요?" ("안 들어가죠?"처럼 부정형으로 묻지 않는다.)
+- ask는 ask_ko를 사용자 언어로 옮긴 것.
+- ask_all_ko는 여러 메뉴를 한 번에 물어보는 짧고 공손한 한국어 한 문장. 예: "새우나 게가 안 들어간 메뉴가 뭐예요?", "돼지고기 안 들어간 메뉴가 뭐예요?" ask_all은 그것을 사용자 언어로 옮긴 것.
+- 할랄 기준: 돼지고기와 그 파생물(돼지기름, 젤라틴, 돼지뼈 육수), 술(맛술, 미림, 청주, 소주, 와인 — 고기 잡내 제거나 양념에 흔함)은 해당. 소·닭 등 고기는 할랄 도축 여부를 사진으로 알 수 없으므로 최소 "ask". 해산물·채소만 들어간 음식도 맛술·돼지기름 가능성이 있으면 "ask". 할랄 "인증"이라고 절대 말하지 않는다.
+- 채식(vegetarian) 기준: 고기·생선·해산물과 그 육수·젓갈·액젓은 해당, 달걀·유제품·꿀은 허용.
 - 출력은 스키마에 맞는 JSON만.`;
 
 const MENU_PROMPT = `너는 한국 음식 재료 추정 도우미다. 외국인 여행자가 한국 축제/포장마차 메뉴판 사진을 보낸다.
@@ -37,6 +41,9 @@ const MENU_PROMPT = `너는 한국 음식 재료 추정 도우미다. 외국인 
 - 국수/잔치국수/우동: 밀면, 멸치 육수 또는 가쓰오부시(생선), 고명에 달걀지단
 - 곱창: 소 또는 돼지 곱창(가게마다 다름). 닭발: 닭, 양념에 간장(밀). 번데기: 누에 번데기(곤충, 동물성)
 - 비건: 꿀·젓갈·액젓·멸치 육수·버터·달걀·우유·동물성 기름까지 모두 동물성으로 본다.
+- 술: 불고기·닭꼬치·닭강정·양념 고기류는 맛술·청주로 재우는 경우가 흔함.
+- 대두(콩): 간장·된장·고추장·두부에 들어감 → 간장 양념이 있는 거의 모든 음식.
+- 참깨: 참기름(김밥, 나물, 양념), 깨 토핑(호떡, 강정, 떡꼬치)에 흔함.
 
 메뉴판을 읽을 수 없거나(흐림, 너무 멀리, 어두움), 가격만 있고 메뉴 이름이 없거나, 메뉴판이 아닌 사진(예: 음식만 찍은 사진)이면 readable=false, items=[], notes에 이유를 쓴다.
 label_contains, label_facility는 빈 문자열.
@@ -48,7 +55,7 @@ const LABEL_PROMPT = `너는 한국 포장식품 원재료 표시 판독 도우�
 할 일:
 - 추정하지 말고 라벨에 적힌 그대로 읽는다. 글자가 선명하면 confidence는 "high".
 - items에는 제품 하나만 넣는다. name_ko는 제품명(안 보이면 "이 제품"), name은 사용자 언어로 된 짧은 제품 설명.
-- likely_ingredients: 원재료명을 적힌 순서·표기 그대로(복합원재료 괄호 안 성분 포함, 최대 30개 정도로).
+- likely_ingredients: 원재료를 적힌 순서대로, 각 항목은 "사용자 언어 (라벨에 적힌 한국어 그대로)" 형식(복합원재료 괄호 안 성분 포함, 최대 30개 정도로).
 - flagged_ingredients: 그중 선택된 기준에 해당하는 원재료.
 - label_contains: "…함유" 같은 알레르기 유발물질 표시 문구를 적힌 그대로. 없으면 "".
 - label_facility: "같은 제조시설에서 …를 사용한 제품과 같은 제조시설에서 제조" 같은 문구를 적힌 그대로. 없으면 "".
@@ -73,6 +80,10 @@ const LANG_NAME: Record<Lang, string> = {
 };
 
 const RESTRICTION_DESC: Record<Restriction, string> = {
+  halal: "halal — no pork or pork derivatives, no alcohol incl. cooking wine (맛술/미림/청주); other meat's slaughter is unknown → at least ask",
+  vegetarian: "vegetarian — no meat, fish, seafood, or their broths/sauces (젓갈, 액젓, 멸치 육수); egg, dairy, honey allowed",
+  soy: "soy — ALLERGY (대두: soy sauce 간장, doenjang, gochujang, tofu)",
+  sesame: "sesame — ALLERGY (참깨, 참기름, 깨 토핑)",
   pork: "pork (돼지고기, incl. lard, pork broth, 돼지기름, pork sausage/ham)",
   beef: "beef (소고기, incl. beef broth/사골)",
   crustacean: "crustaceans — ALLERGY (갑각류: shrimp, crab, 새우젓)",
@@ -85,5 +96,5 @@ const RESTRICTION_DESC: Record<Restriction, string> = {
 };
 
 export function userPrompt(restrictions: Restriction[], lang: Lang) {
-  return `Selected dietary restrictions:\n${restrictions.map((r) => `- ${r}: ${RESTRICTION_DESC[r]}`).join("\n")}\n\nUser language for name, reason, notes: ${LANG_NAME[lang]}. ask_ko and ask_all_ko stay Korean. Use only the ids above in triggered_restrictions.`;
+  return `Selected dietary restrictions:\n${restrictions.map((r) => `- ${r}: ${RESTRICTION_DESC[r]}`).join("\n")}\n\nUser language (for name, reason, notes, ask, ask_all, and the first part of each ingredient): ${LANG_NAME[lang]}. ask_ko and ask_all_ko stay Korean. Use only the ids above in triggered_restrictions.`;
 }
