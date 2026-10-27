@@ -1,7 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { RequestSchema, ResultSchema } from "@/lib/schema";
+import { ApiError } from "@google/genai";
+import { RESULT_JSON_SCHEMA, RequestSchema, ResultSchema } from "@/lib/schema";
 import { SYSTEM_PROMPTS, userPrompt } from "@/lib/prompt";
+import { generateJson } from "@/lib/gemini";
 import { SAMPLE_RESULT } from "@/lib/sample";
 
 export const maxDuration = 60;
@@ -46,48 +46,35 @@ export async function POST(req: Request) {
     await new Promise((r) => setTimeout(r, 800));
     return Response.json(SAMPLE_RESULT);
   }
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.error("ANTHROPIC_API_KEY is not set (set it, or MOCK_MODE=true)");
+  if (!process.env.GEMINI_API_KEY) {
+    console.error("GEMINI_API_KEY is not set (set it, or MOCK_MODE=true)");
     return fail("server_misconfigured", 500);
   }
 
-  const client = new Anthropic({ maxRetries: 0 }); // we retry ourselves within the time budget
   const deadline = Date.now() + BUDGET_MS;
   let timedOut = false;
   for (let attempt = 1; attempt <= 2; attempt++) {
     const left = deadline - Date.now();
     if (left < 10_000) break;
     try {
-      const res = await client.messages.parse(
-        {
-          model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5",
-          max_tokens: 8000,
-          output_config: { effort: "low", format: zodOutputFormat(ResultSchema) },
-          system: [{ type: "text", text: SYSTEM_PROMPTS[mode], cache_control: { type: "ephemeral" } }],
-          messages: [
-            {
-              role: "user",
-              content: [
-                { type: "image", source: { type: "base64", media_type: mediaType, data: image } },
-                { type: "text", text: userPrompt(restrictions, lang) },
-              ],
-            },
-          ],
-        },
-        { timeout: left },
+      const json = await generateJson(
+        SYSTEM_PROMPTS[mode],
+        [{ inlineData: { mimeType: mediaType, data: image } }, { text: userPrompt(restrictions, lang) }],
+        RESULT_JSON_SCHEMA,
+        left,
       );
-      if (res.stop_reason === "refusal") return fail("analysis_failed", 502);
-      const parsed = ResultSchema.safeParse(res.parsed_output);
+      const parsed = ResultSchema.safeParse(json);
       if (parsed.success) return Response.json(parsed.data);
-      console.error(`analyze attempt ${attempt}: schema mismatch (stop_reason=${res.stop_reason})`);
+      console.error(`analyze attempt ${attempt}: schema mismatch`);
     } catch (err) {
       // Log class/status only: never the image or the key.
-      const status = err instanceof Anthropic.APIError ? err.status : undefined;
-      console.error(`analyze attempt ${attempt}: ${(err as Error).name} ${status ?? ""}`);
-      if (err instanceof Anthropic.APIConnectionTimeoutError) timedOut = true;
-      if (err instanceof Anthropic.RateLimitError) return fail("rate_limited", 429);
-      if (err instanceof Anthropic.AuthenticationError) return fail("server_misconfigured", 500);
-      if (err instanceof Anthropic.BadRequestError) break;
+      const e = err as Error;
+      const status = err instanceof ApiError ? err.status : undefined;
+      console.error(`analyze attempt ${attempt}: ${e.name} ${status ?? ""}`);
+      if (e.name === "TimeoutError" || e.name === "AbortError") timedOut = true;
+      if (status === 429) return fail("rate_limited", 429);
+      if (status === 401 || status === 403) return fail("server_misconfigured", 500);
+      if (status === 400) break; // includes an invalid key; retrying won't help
     }
   }
   return timedOut ? fail("timeout", 504) : fail("analysis_failed", 502);

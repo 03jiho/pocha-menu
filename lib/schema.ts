@@ -46,6 +46,10 @@ export const ResultSchema = z.object({
   label_facility: z.string(), // label mode: shared-facility statement as printed; "" otherwise
 });
 
+// Sent to Gemini as responseJsonSchema ($schema is not in its supported keyword list).
+export const RESULT_JSON_SCHEMA: Record<string, unknown> = z.toJSONSchema(ResultSchema);
+delete RESULT_JSON_SCHEMA.$schema;
+
 export type Item = z.infer<typeof ItemSchema>;
 export type AnalyzeResult = z.infer<typeof ResultSchema>;
 
