@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 640" font-family="'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif">
+  <rect width="600" height="640" rx="24" fill="#1f3a2b"/>
+  <rect x="16" y="16" width="568" height="608" rx="16" fill="none" stroke="#e8d9a8" stroke-width="4"/>
+  <text x="300" y="92" text-anchor="middle" font-size="56" font-weight="700" fill="#ffd34d">포장마차 메뉴</text>
+  <g font-size="40" fill="#ffffff">
+    <text x="60" y="190">어묵</text><text x="540" y="190" text-anchor="end">1,000</text>
+    <text x="60" y="270">떡볶이</text><text x="540" y="270" text-anchor="end">4,000</text>
+    <text x="60" y="350">순대</text><text x="540" y="350" text-anchor="end">4,000</text>
+    <text x="60" y="430">새우튀김</text><text x="540" y="430" text-anchor="end">2,000</text>
+    <text x="60" y="510">씨앗호떡</text><text x="540" y="510" text-anchor="end">2,000</text>
+    <text x="60" y="590">군고구마</text><text x="540" y="590" text-anchor="end">3,000</text>
+  </g>
+</svg>

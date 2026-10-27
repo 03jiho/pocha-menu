@@ -1,0 +1,81 @@
+import type { AnalyzeResult, Restriction } from "./schema";
+
+// Offline demo safety net: matches public/sample-menu.svg, judged for SAMPLE_RESTRICTIONS. Also returned by MOCK_MODE.
+export const SAMPLE_IMAGE = "/sample-menu.svg";
+export const SAMPLE_RESTRICTIONS: Restriction[] = ["pork", "crustacean"];
+
+export const SAMPLE_RESULT: AnalyzeResult = {
+  readable: true,
+  items: [
+    {
+      name_ko: "어묵",
+      name: "Fish cake skewer",
+      likely_ingredients: ["생선살", "밀가루", "멸치 육수", "무", "간장"],
+      flagged_ingredients: [],
+      verdict: "ask",
+      confidence: "medium",
+      reason: "Usually fish paste in anchovy broth, but some stalls add shrimp, crab or pork bones to the broth.",
+      triggered_restrictions: ["pork", "crustacean"],
+      ask_ko: "국물에 새우, 게, 돼지고기 들어가나요?",
+    },
+    {
+      name_ko: "떡볶이",
+      name: "Spicy rice cakes",
+      likely_ingredients: ["떡", "고추장", "어묵", "멸치 육수", "설탕", "대파"],
+      flagged_ingredients: [],
+      verdict: "ask",
+      confidence: "medium",
+      reason: "Usually no pork or shellfish, but the broth or toppings vary by stall.",
+      triggered_restrictions: ["crustacean"],
+      ask_ko: "떡볶이 국물에 새우나 돼지고기 들어가나요?",
+    },
+    {
+      name_ko: "순대",
+      name: "Korean blood sausage",
+      likely_ingredients: ["돼지 창자", "돼지 피", "당면", "찹쌀", "새우젓"],
+      flagged_ingredients: ["돼지 창자", "돼지 피", "새우젓"],
+      verdict: "avoid",
+      confidence: "high",
+      reason: "Made with pork intestine and pork blood, and usually served with salted shrimp dip.",
+      triggered_restrictions: ["pork", "crustacean"],
+      ask_ko: "순대에 돼지고기 들어가나요?",
+    },
+    {
+      name_ko: "새우튀김",
+      name: "Fried shrimp",
+      likely_ingredients: ["새우", "밀가루", "달걀", "식용유"],
+      flagged_ingredients: ["새우"],
+      verdict: "avoid",
+      confidence: "high",
+      reason: "Contains shrimp. Other fried items here likely share the same oil.",
+      triggered_restrictions: ["crustacean"],
+      ask_ko: "새우튀김이랑 같은 기름에 튀기나요?",
+    },
+    {
+      name_ko: "씨앗호떡",
+      name: "Seed-filled sweet pancake",
+      likely_ingredients: ["밀가루", "흑설탕", "땅콩", "해바라기씨", "식용유"],
+      flagged_ingredients: [],
+      verdict: "ok",
+      confidence: "medium",
+      reason: "Usually wheat dough with sugar and seeds, griddled in oil. Cross-contamination cannot be ruled out.",
+      triggered_restrictions: [],
+      ask_ko: "호떡 구울 때 돼지기름 쓰시나요?",
+    },
+    {
+      name_ko: "군고구마",
+      name: "Roasted sweet potato",
+      likely_ingredients: ["고구마"],
+      flagged_ingredients: [],
+      verdict: "ok",
+      confidence: "high",
+      reason: "Usually just sweet potato roasted over fire. Cross-contamination cannot be ruled out.",
+      triggered_restrictions: [],
+      ask_ko: "고구마 말고 다른 재료 들어가나요?",
+    },
+  ],
+  ask_all_ko: "돼지고기나 새우·게가 안 들어간 메뉴가 뭐예요?",
+  notes: "Sample menu (no photo was sent). Recipes vary by stall.",
+  label_contains: "",
+  label_facility: "",
+};

@@ -1,13 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { RequestSchema, ResultSchema, type AnalyzeResult } from "@/lib/schema";
-import { MENU_SYSTEM_PROMPT, userPrompt } from "@/lib/prompt";
-import { MOCK_RESULT } from "@/lib/mock";
+import { RequestSchema, ResultSchema } from "@/lib/schema";
+import { SYSTEM_PROMPTS, userPrompt } from "@/lib/prompt";
+import { SAMPLE_RESULT } from "@/lib/sample";
 
 export const maxDuration = 60;
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const RATE_LIMIT = 10; // requests per IP per minute
+const BUDGET_MS = 55_000; // stay under maxDuration including the retry
 
 // ponytail: in-memory, per serverless instance. Good enough for a demo; use Upstash/KV if abused.
 const hits = new Map<string, number[]>();
@@ -35,7 +36,7 @@ export async function POST(req: Request) {
 
   const body = RequestSchema.safeParse(await req.json().catch(() => null));
   if (!body.success) return fail("bad_request", 400);
-  const { image, mediaType, restrictions } = body.data;
+  const { image, mediaType, restrictions, lang, mode } = body.data;
 
   const buf = Buffer.from(image, "base64");
   if (buf.length > MAX_IMAGE_BYTES) return fail("too_large", 413);
@@ -43,38 +44,51 @@ export async function POST(req: Request) {
 
   if (process.env.MOCK_MODE === "true") {
     await new Promise((r) => setTimeout(r, 800));
-    return Response.json(MOCK_RESULT);
+    return Response.json(SAMPLE_RESULT);
+  }
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.error("ANTHROPIC_API_KEY is not set (set it, or MOCK_MODE=true)");
+    return fail("server_misconfigured", 500);
   }
 
-  // timeout per attempt keeps two attempts inside maxDuration; we retry ourselves, so SDK retries are off.
-  const client = new Anthropic({ timeout: 28_000, maxRetries: 0 });
+  const client = new Anthropic({ maxRetries: 0 }); // we retry ourselves within the time budget
+  const deadline = Date.now() + BUDGET_MS;
+  let timedOut = false;
   for (let attempt = 1; attempt <= 2; attempt++) {
+    const left = deadline - Date.now();
+    if (left < 10_000) break;
     try {
-      const res = await client.messages.parse({
-        model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5",
-        max_tokens: 8000,
-        output_config: { effort: "low", format: zodOutputFormat(ResultSchema) },
-        system: MENU_SYSTEM_PROMPT,
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "image", source: { type: "base64", media_type: mediaType, data: image } },
-              { type: "text", text: userPrompt(restrictions) },
-            ],
-          },
-        ],
-      });
+      const res = await client.messages.parse(
+        {
+          model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5",
+          max_tokens: 8000,
+          output_config: { effort: "low", format: zodOutputFormat(ResultSchema) },
+          system: [{ type: "text", text: SYSTEM_PROMPTS[mode], cache_control: { type: "ephemeral" } }],
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "image", source: { type: "base64", media_type: mediaType, data: image } },
+                { type: "text", text: userPrompt(restrictions, lang) },
+              ],
+            },
+          ],
+        },
+        { timeout: left },
+      );
       if (res.stop_reason === "refusal") return fail("analysis_failed", 502);
       const parsed = ResultSchema.safeParse(res.parsed_output);
-      if (parsed.success) return Response.json(parsed.data satisfies AnalyzeResult);
+      if (parsed.success) return Response.json(parsed.data);
       console.error(`analyze attempt ${attempt}: schema mismatch (stop_reason=${res.stop_reason})`);
     } catch (err) {
-      // Log status/class only: never the image or the key.
+      // Log class/status only: never the image or the key.
       const status = err instanceof Anthropic.APIError ? err.status : undefined;
       console.error(`analyze attempt ${attempt}: ${(err as Error).name} ${status ?? ""}`);
-      if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.BadRequestError) break;
+      if (err instanceof Anthropic.APIConnectionTimeoutError) timedOut = true;
+      if (err instanceof Anthropic.RateLimitError) return fail("rate_limited", 429);
+      if (err instanceof Anthropic.AuthenticationError) return fail("server_misconfigured", 500);
+      if (err instanceof Anthropic.BadRequestError) break;
     }
   }
-  return fail("analysis_failed", 502);
+  return timedOut ? fail("timeout", 504) : fail("analysis_failed", 502);
 }
