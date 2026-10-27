@@ -16,6 +16,9 @@ export async function generateJson(system: string, parts: Part[], jsonSchema: un
       // Default (medium) thinking ran past the 55s budget on a 6-item menu; low keeps it inside.
       thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
       abortSignal: AbortSignal.timeout(timeoutMs),
+      // SDK default is 5 attempts with backoff on 408/429/5xx, which burned the whole budget and hid
+      // the real status behind an AbortError. The route retries once itself.
+      httpOptions: { retryOptions: { attempts: 1 } },
     },
   });
   const text = res.text;
