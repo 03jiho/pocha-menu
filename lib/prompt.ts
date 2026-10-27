@@ -5,7 +5,8 @@ const COMMON_RULES = `공통 규칙:
 - verdict는 선택된 기준 전체를 합쳐 가장 조심스러운 쪽으로 정한다(avoid > ask > ok).
 - 갑각류/견과류/달걀 같은 알레르기 기준은 특히 보수적으로 판단한다. 알레르기 기준이 선택된 상태에서 "ok"를 낼 때는 reason에 교차오염 가능성은 확인할 수 없다는 문장을 넣는다.
 - triggered_restrictions: 선택된 기준 중 이 항목에 해당하거나 의심되는 것만.
-- likely_ingredients의 각 항목은 "사용자 언어 (한국어)" 형식으로 쓴다. 예(영어): "egg (달걀)", "anchovy broth (멸치 육수)". 사용자는 한국어를 못 읽는다.
+- likely_ingredients의 각 항목은 "사용자 언어 (한국어)" 형식으로 쓴다. 괄호 앞은 반드시 사용자 언어(영어가 아닐 수 있음). 사용자는 한국어를 못 읽는다.
+- name은 사용자 언어로 된 짧은 음식 설명이다. 한국어 이름은 name_ko에만 쓴다.
 - flagged_ingredients: likely_ingredients 중 선택된 기준에 걸리는 항목만, likely_ingredients와 글자 하나까지 똑같은 문자열로.
 - name, reason, notes, ask, ask_all은 지정된 사용자 언어로 쓴다. reason은 1~2문장으로 짧게.
 - ask_ko는 상인(또는 점원)에게 그대로 보여줄 짧고 공손한 한국어 예/아니오 질문 한 문장. 상인이 "네"라고 답하면 "그 재료가 들어간다"는 뜻이 되도록 묻는다. 선택된 기준에 맞춘다. 예: "새우나 게가 들어가나요?", "육수에 돼지고기 쓰시나요?", "양념에 맛술이나 술이 들어가나요?" ("안 들어가죠?"처럼 부정형으로 묻지 않는다.)
@@ -79,6 +80,14 @@ const LANG_NAME: Record<Lang, string> = {
   ar: "Arabic",
 };
 
+// Per-language example so the model doesn't copy an English sample into a Japanese answer.
+const LANG_EXAMPLE: Record<Lang, string> = {
+  en: 'name "Fish cake skewer"; ingredients "egg (달걀)", "anchovy broth (멸치 육수)"',
+  ja: 'name "おでん串"; ingredients "卵 (달걀)", "煮干しだし (멸치 육수)"',
+  zh: 'name "鱼饼串"; ingredients "鸡蛋 (달걀)", "鳀鱼高汤 (멸치 육수)"',
+  ar: 'name "أسياخ كعك السمك"; ingredients "بيض (달걀)", "مرق الأنشوفة (멸치 육수)"',
+};
+
 const RESTRICTION_DESC: Record<Restriction, string> = {
   halal: "halal — no pork or pork derivatives, no alcohol incl. cooking wine (맛술/미림/청주); other meat's slaughter is unknown → at least ask",
   vegetarian: "vegetarian — no meat, fish, seafood, or their broths/sauces (젓갈, 액젓, 멸치 육수); egg, dairy, honey allowed",
@@ -96,5 +105,5 @@ const RESTRICTION_DESC: Record<Restriction, string> = {
 };
 
 export function userPrompt(restrictions: Restriction[], lang: Lang) {
-  return `Selected dietary restrictions:\n${restrictions.map((r) => `- ${r}: ${RESTRICTION_DESC[r]}`).join("\n")}\n\nUser language (for name, reason, notes, ask, ask_all, and the first part of each ingredient): ${LANG_NAME[lang]}. ask_ko and ask_all_ko stay Korean. Use only the ids above in triggered_restrictions.`;
+  return `Selected dietary restrictions:\n${restrictions.map((r) => `- ${r}: ${RESTRICTION_DESC[r]}`).join("\n")}\n\nUser language (for name, reason, notes, ask, ask_all, and the part of each ingredient before the parentheses): ${LANG_NAME[lang]}. Example in this language: ${LANG_EXAMPLE[lang]}. ask_ko and ask_all_ko stay Korean. Use only the ids above in triggered_restrictions.`;
 }
