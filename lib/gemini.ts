@@ -1,6 +1,6 @@
 import { GoogleGenAI, ThinkingLevel, type Part } from "@google/genai";
 
-export const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+export const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 
 // One structured-output call. Returns the parsed JSON; the caller validates it with zod.
 export async function generateJson(system: string, parts: Part[], jsonSchema: unknown, timeoutMs: number) {
@@ -13,7 +13,7 @@ export async function generateJson(system: string, parts: Part[], jsonSchema: un
       responseMimeType: "application/json",
       responseJsonSchema: jsonSchema,
       maxOutputTokens: 8192,
-      // Default (medium) thinking ran past the 55s budget on a 6-item menu; low keeps it inside.
+      // Low thinking keeps latency well inside the 55s route budget.
       thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
       abortSignal: AbortSignal.timeout(timeoutMs),
       // SDK default is 5 attempts with backoff on 408/429/5xx, which burned the whole budget and hid
