@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "eval": "node tests/eval.mts"
+    "eval": "node --env-file-if-exists=.env.local tests/eval.mts"
   },
   "dependencies": {
     "@google/genai": "^2.31.0",

@@ -47,6 +47,45 @@ function statementsKo(restrictions: Restriction[], other?: string) {
   return restrictions.map((r) => (r === "other" ? `${VENDOR_KO.statements.other} ${other ?? ""}` : VENDOR_KO.statements[r]));
 }
 
+// Reads Korean aloud with the browser's built-in voice: festivals are noisy and small screens are hard to read.
+const canSpeak = () => typeof window !== "undefined" && "speechSynthesis" in window;
+function speakKo(lines: string[]) {
+  if (!canSpeak()) return;
+  speechSynthesis.cancel();
+  // End every line with punctuation so the voice pauses between them.
+  const text = lines
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((l) => (/[.!?:]$/.test(l) ? l : `${l}.`))
+    .join(" ");
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "ko-KR";
+  u.rate = 0.9;
+  speechSynthesis.speak(u);
+}
+
+// Keeps the screen on while the phone is handed to the vendor (web pages can't raise brightness; this is the closest).
+function useWakeLock() {
+  useEffect(() => {
+    let lock: WakeLockSentinel | null = null;
+    let closed = false;
+    if ("wakeLock" in navigator) {
+      navigator.wakeLock.request("screen").then(
+        (l) => {
+          if (closed) l.release().catch(() => {}); // screen already closed: let go at once
+          else lock = l;
+        },
+        () => {},
+      );
+    }
+    return () => {
+      closed = true;
+      lock?.release().catch(() => {});
+      if (canSpeak()) speechSynthesis.cancel();
+    };
+  }, []);
+}
+
 const VERDICT_STYLE: Record<Verdict, string> = {
   ok: "bg-green-700 text-white",
   ask: "bg-yellow-300 text-black",
@@ -245,6 +284,7 @@ export default function Home() {
           t={t}
           result={state.run.sample ? sampleResult(lang) : state.result}
           run={state.run}
+          photo={state.run.sample ? null : photo}
           onVendor={setVendor}
           onReset={() => {
             setPhoto(null);
@@ -376,12 +416,14 @@ function Results({
   t,
   result,
   run,
+  photo,
   onVendor,
   onReset,
 }: {
   t: Strings;
   result: AnalyzeResult;
   run: Run;
+  photo: string | null;
   onVendor: (v: VendorAsk) => void;
   onReset: () => void;
 }) {
@@ -389,6 +431,8 @@ function Results({
   const [riskFirst, setRiskFirst] = useState(true);
   const [answers, setAnswers] = useState<Record<number, Answer>>({}); // vendor answers, by item index
   const hasAllergy = run.restrictions.some((r) => ALLERGY.includes(r));
+  // Like a food-scanner "better alternatives" list: OK items from the same board, shown on AVOID cards.
+  const alternatives = result.items.filter((i) => i.verdict === "ok").map((i) => `${i.name_ko} (${i.name})`).slice(0, 3);
   const count = (v: Verdict) => result.items.filter((i) => i.verdict === v).length;
 
   const shown = result.items
@@ -408,6 +452,11 @@ function Results({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={SAMPLE_IMAGE} alt="" className="mx-auto mt-2 max-h-48 rounded-lg" />
         </div>
+      )}
+      {photo && (
+        // Lets the traveler match cards to the real board.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={`data:image/jpeg;base64,${photo}`} alt={t.myPhoto} className="mx-auto mt-3 max-h-48 rounded-xl" />
       )}
 
       <p className="mt-3 text-xl font-bold">
@@ -476,6 +525,7 @@ function Results({
             mode={run.mode}
             hasAllergy={hasAllergy}
             canAsk={asks.length > 0}
+            alternatives={it.verdict === "avoid" ? alternatives : []}
             answer={answers[i]}
             onVendor={() =>
               onVendor({
@@ -511,6 +561,7 @@ function Card({
   mode,
   hasAllergy,
   canAsk,
+  alternatives,
   answer,
   onVendor,
 }: {
@@ -518,6 +569,7 @@ function Card({
   it: Item;
   mode: Mode;
   canAsk: boolean;
+  alternatives: string[];
   hasAllergy: boolean;
   answer?: Answer;
   onVendor: () => void;
@@ -549,6 +601,11 @@ function Card({
             </li>
           ))}
         </ul>
+      )}
+      {alternatives.length > 0 && (
+        <p className="mt-2 rounded-xl bg-green-50 px-3 py-2 text-sm text-green-900">
+          <span className="font-semibold">✓ {t.tryInstead}</span> <span lang="ko">{alternatives.join(", ")}</span>
+        </p>
       )}
       {answer && (
         <p className={`mt-2 rounded-xl px-3 py-2 text-sm font-bold ${ANSWER_STYLE[answer]}`}>
@@ -593,6 +650,7 @@ function Card({
 // tap-to-answer buttons). After a tap: the answer in the traveler's language.
 function VendorScreen({ t, ask, onClose }: { t: Strings; ask: VendorAsk; onClose: () => void }) {
   const [answer, setAnswer] = useState<Answer | null>(null);
+  useWakeLock();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -640,6 +698,16 @@ function VendorScreen({ t, ask, onClose }: { t: Strings; ask: VendorAsk; onClose
               )}
               {ask.title && <p className="mt-6 text-2xl font-semibold text-neutral-700">{ask.title}</p>}
               <p className="mt-2 text-4xl font-bold leading-tight break-keep">{ask.ko}</p>
+              {canSpeak() && (
+                <button
+                  onClick={() =>
+                    speakKo([VENDOR_KO.greeting, ...statementsKo(ask.restrictions, ask.other), ask.ko])
+                  }
+                  className="mt-3 min-h-11 rounded-xl border-2 border-neutral-900 px-4 text-base font-semibold"
+                >
+                  🔊 {t.readAloud}
+                </button>
+              )}
               {!ask.answerable && <p className="mt-6 text-xl font-semibold text-neutral-800">{VENDOR_KO.pleasePoint}</p>}
               {ask.answerable && (
                 <>
@@ -685,6 +753,7 @@ function EmergencyScreen({
   other: string;
   onClose: () => void;
 }) {
+  useWakeLock();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -702,6 +771,20 @@ function EmergencyScreen({
         </div>
         <div className="mt-6 flex-1" lang="ko" dir="ltr">
           <p className="text-4xl font-bold leading-tight break-keep">{VENDOR_KO.emergencyTitle}</p>
+          {canSpeak() && (
+            <button
+              onClick={() =>
+                speakKo([
+                  VENDOR_KO.emergencyTitle.replace("🚨", ""),
+                  ...VENDOR_KO.emergencyLines,
+                  ...(allergies.length ? [VENDOR_KO.emergencyMine, ...statementsKo(allergies, other)] : []),
+                ])
+              }
+              className="mt-3 min-h-11 rounded-xl bg-white px-4 text-base font-semibold text-red-700"
+            >
+              🔊 {t.readAloud}
+            </button>
+          )}
           <ul className="mt-6 grid gap-3 text-2xl font-semibold break-keep">
             {VENDOR_KO.emergencyLines.map((l) => (
               <li key={l}>• {l}</li>
