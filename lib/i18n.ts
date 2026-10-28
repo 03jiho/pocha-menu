@@ -445,9 +445,11 @@ export const VENDOR_KO = {
   answer: { yes: "네, 들어가요", no: "아니요, 안 들어가요", unsure: "잘 모르겠어요" } as Record<Answer, string>,
   dietCardAsk: "이 음식에 제가 못 먹는 재료가 들어가나요?",
   statements: {
-    halal: "할랄 음식만 먹어요. 돼지고기와 술(맛술 포함)은 안 돼요.",
-    vegetarian: "채식을 해요. 고기, 생선, 해산물, 젓갈은 못 먹어요.",
-    vegan: "비건이에요. 고기, 생선, 달걀, 우유, 꿀은 못 먹어요.",
+    // Many stall vendors don't know the words "할랄"/"비건", so each says what the rule actually rules out.
+    // Slaughter method is left out on purpose: a stall vendor can't know it, so it would only lengthen the card.
+    halal: "할랄 음식만 먹어요(이슬람교 식사 규칙). 돼지고기·돼지기름·돼지뼈 육수와 술(맛술·미림 포함)이 들어가면 못 먹어요.",
+    vegetarian: "채식을 해요. 고기, 생선, 해산물과 멸치 육수, 젓갈, 액젓은 못 먹어요. 달걀과 우유는 괜찮아요.",
+    vegan: "비건(완전 채식)이에요. 고기, 생선, 해산물, 달걀, 우유·버터, 꿀은 물론 멸치 육수, 젓갈, 액젓도 못 먹어요.",
     pork: "돼지고기를 못 먹어요.",
     beef: "소고기를 못 먹어요.",
     crustacean: "새우·게 알레르기가 있어요.",
