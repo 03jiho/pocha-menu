@@ -78,6 +78,11 @@ for (const [n, r] of (only ? [only] : EVAL_RESTRICTIONS).entries()) {
   console.log(rows.at(-1));
 }
 
+if (!rows.length) {
+  // An empty run must not read as "0 dangerous misses".
+  console.log(`No results. ${stoppedEarly}`);
+  process.exit(1);
+}
 const list = (xs: string[]) => xs.map((x) => `- ${x}`).join("\n") || "- none";
 const md = `# Menu safety check — ${GEMINI_MODEL}, ${new Date().toISOString().slice(0, 10)}
 

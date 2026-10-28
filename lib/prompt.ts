@@ -36,21 +36,22 @@ JUDGING:
 - Never state an ingredient you cannot see as certain. If unsure, lower confidence and use "ask".
 - If anything related to a selected restriction is even slightly in doubt, use "ask", not "ok". If a restricted ingredient is commonly used, use "avoid".
 - Always consider hidden ingredients in broth, sauce, oil, seasoning and batter, and include them in likely_ingredients.
+- If the reference below lists an ingredient for a dish (even "some stalls", "some use", "sometimes") and it hits a selected restriction, the verdict is at least "ask", never "ok".
 
 HIDDEN INGREDIENTS OFTEN MISSED (reference):
 - 떡볶이/라볶이 (spicy rice cakes): gochujang (often contains wheat), fish cake (fish, wheat), anchovy-kelp broth, wheat rice cakes at many stalls; 라볶이 adds ramen (wheat, beef or seafood soup base).
 - 어묵/오뎅탕 (fish cake): fish paste + flour (+ starch, sometimes egg white); broth of anchovy, kelp, radish; some stalls add shrimp, crab or pork-bone broth.
 - 순대 (blood sausage): pork intestine, pork blood, glass noodles; served with pork liver/lung and a salted-shrimp dip (새우젓, crustacean).
 - 튀김/핫도그/새우튀김 (fried snacks, corn dogs): batter often has egg; frying oil is shared with fried shrimp (cross-contact); some use lard; corn-dog sausages are often pork/chicken mix, batter has milk and egg.
-- 전/부침개 (pancakes): flour + egg; 해물파전 has squid, shrimp, clams; the kimchi in 김치전 often has 젓갈 (salted shrimp → crustacean, anchovy sauce → fish).
+- 전/부침개 (pancakes, incl. 감자전 and 빈대떡): flour + egg (egg is common even in potato and mung-bean pancakes); often fried in lard at stalls; 빈대떡 usually has pork; 해물파전 has squid, shrimp, clams; the kimchi in 김치전 often has 젓갈 (salted shrimp → crustacean, anchovy sauce → fish).
 - Anything with kimchi: possible 젓갈 → crustacean, fish, vegan.
 - 닭강정/닭꼬치/떡꼬치 (glazed chicken, skewers): soy sauce (wheat) and syrup glaze; 닭강정 is often topped with peanuts/nuts; some use oyster sauce (mollusk).
 - 소떡소떡: sausage (often pork) + rice cake (may be wheat) + sauce (often ketchup → tomato).
 - 호떡 (sweet pancake): wheat dough (sometimes milk/butter), griddled with margarine/butter; 씨앗호떡 has peanuts, sunflower and pumpkin seeds.
 - 붕어빵/계란빵/꽈배기: flour + egg + milk; red bean or custard (egg, milk) filling.
-- 김밥: ham (pork), fish cake, imitation crab (fish), egg strips, sesame oil.
+- 김밥: ham (pork), fish cake, imitation crab (fish; often contains some crab extract → crustacean), egg strips, sesame oil.
 - 국수/잔치국수/우동 (noodles): wheat noodles, anchovy or bonito broth (fish), egg garnish.
-- 곱창: beef or pork intestines (varies by stall). 닭발: chicken feet, soy-sauce seasoning (wheat). 번데기: silkworm pupae (insect, animal product).
+- 곱창: beef or pork intestines (varies by stall). 닭발: chicken feet, soy-sauce seasoning (wheat). 번데기: silkworm pupae (insect, animal product; cross-reacts with shrimp/crab allergy → crustacean at least "ask").
 - Vegan: honey, 젓갈, fish sauce, anchovy broth, butter, egg, milk and animal fat all count as animal products.
 - Alcohol: bulgogi, chicken skewers, 닭강정 and marinated meats are often marinated with cooking wine (맛술/청주).
 - Soy: soy sauce, doenjang, gochujang, tofu → almost every soy-sauce-seasoned dish.
