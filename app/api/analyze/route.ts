@@ -2,7 +2,7 @@ import { ApiError } from "@google/genai";
 import { RESULT_JSON_SCHEMA, RequestSchema, ResultSchema, type Restriction } from "@/lib/schema";
 import { SYSTEM_PROMPTS, userPrompt } from "@/lib/prompt";
 import { GEMINI_FALLBACK_MODEL, GEMINI_MODEL, generateJson } from "@/lib/gemini";
-import { SAMPLE_RESULT } from "@/lib/sample";
+import { sampleResult } from "@/lib/sample";
 
 export const maxDuration = 60;
 
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
 
   if (process.env.MOCK_MODE === "true") {
     await new Promise((r) => setTimeout(r, 800));
-    return Response.json(SAMPLE_RESULT);
+    return Response.json(sampleResult(lang));
   }
   if (!process.env.GEMINI_API_KEY) {
     console.error("GEMINI_API_KEY is not set (set it, or MOCK_MODE=true)");

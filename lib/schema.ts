@@ -43,7 +43,7 @@ export const ResultSchema = z.object({
   items: z.array(ItemSchema),
   ask_all_ko: z.string(), // one Korean question covering the whole menu
   ask_all: z.string(), // the same question in the user's language
-  other_ko: z.string(), // the user's free-text restriction as a short polite Korean sentence; "" if none
+  other_ko: z.string(), // the user's free-text restriction as a Korean noun phrase ("마늘"); "" if none
   notes: z.string(), // general note, or why it was unreadable; "" if none
   label_contains: z.string(), // label mode: allergen statement as printed ("…함유"); "" otherwise
   label_facility: z.string(), // label mode: shared-facility statement as printed; "" otherwise

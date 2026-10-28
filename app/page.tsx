@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState, type ChangeEvent } from "react";
-import { askKo } from "@/lib/ask";
+import { askable, askKo } from "@/lib/ask";
 import { compressImage } from "@/lib/image";
 import { STRINGS, VENDOR_KO, type Answer, type ErrorCode, type Strings } from "@/lib/i18n";
 import { shareResults } from "@/lib/share";
-import { SAMPLE_IMAGE, SAMPLE_RESTRICTIONS, SAMPLE_RESULT } from "@/lib/sample";
+import { SAMPLE_IMAGE, SAMPLE_RESTRICTIONS, sampleResult } from "@/lib/sample";
 import {
   ALLERGIES,
   ALLERGY,
@@ -106,7 +106,7 @@ export default function Home() {
     setSelected(load("restrictions", isRestrictions) ?? []);
     setOther(load("other", (v): v is string => typeof v === "string") ?? "");
     setOtherKo(
-      load("other_ko", (v): v is { text: string; ko: string } =>
+      load("other_ko_v2", (v): v is { text: string; ko: string } =>
         typeof v === "object" && v !== null && typeof (v as { ko?: unknown }).ko === "string",
       ),
     );
@@ -155,7 +155,7 @@ export default function Home() {
       // Remember the Korean wording so the offline diet/emergency cards can show it too.
       if (otherText && result.other_ko) {
         setOtherKo({ text: otherText, ko: result.other_ko });
-        save("other_ko", { text: otherText, ko: result.other_ko });
+        save("other_ko_v2", { text: otherText, ko: result.other_ko });
       }
       setState({ kind: "done", result, run });
       window.scrollTo(0, 0);
@@ -181,7 +181,7 @@ export default function Home() {
     setPhoto(null);
     setState({
       kind: "done",
-      result: SAMPLE_RESULT,
+      result: sampleResult(lang),
       run: { restrictions: SAMPLE_RESTRICTIONS, mode: "menu", sample: true, other: "" },
     });
     window.scrollTo(0, 0);
@@ -243,7 +243,7 @@ export default function Home() {
       {state.kind === "done" ? (
         <Results
           t={t}
-          result={state.result}
+          result={state.run.sample ? sampleResult(lang) : state.result}
           run={state.run}
           onVendor={setVendor}
           onReset={() => {
@@ -466,19 +466,22 @@ function Results({
       </button>
 
       <ul className="mt-2 grid gap-3">
-        {shown.map(({ it, i }) => (
+        {shown.map(({ it, i }) => {
+          const asks = askable(it.name_ko, it.ask_about);
+          return (
           <Card
             key={i}
             t={t}
             it={it}
             mode={run.mode}
             hasAllergy={hasAllergy}
+            canAsk={asks.length > 0}
             answer={answers[i]}
             onVendor={() =>
               onVendor({
                 title: it.name_ko,
-                ko: askKo(it.name_ko, it.ask_about.map((a) => a.ko)),
-                local: t.askLocal(it.name, it.ask_about.map((a) => a.local)),
+                ko: askKo(it.name_ko, asks.map((a) => a.ko)),
+                local: t.askLocal(it.name, asks.map((a) => a.local)),
                 restrictions: run.restrictions,
                 other: run.other,
                 answerable: true,
@@ -486,7 +489,8 @@ function Results({
               })
             }
           />
-        ))}
+          );
+        })}
       </ul>
 
       <div className="mt-6 grid gap-2">
@@ -506,17 +510,20 @@ function Card({
   it,
   mode,
   hasAllergy,
+  canAsk,
   answer,
   onVendor,
 }: {
   t: Strings;
   it: Item;
   mode: Mode;
+  canAsk: boolean;
   hasAllergy: boolean;
   answer?: Answer;
   onVendor: () => void;
 }) {
-  const showVendor = it.verdict !== "ok" || it.confidence === "low" || hasAllergy;
+  // A clear AVOID with nothing left to ask ("군밤" for a nut allergy) gets no question button.
+  const showVendor = canAsk || (it.verdict !== "avoid" && (it.verdict === "ask" || it.confidence === "low" || hasAllergy));
   // Compact by default (a 15-item menu must stay scannable): name, verdict, reason, flagged ingredients.
   // Everything else sits behind a native <details>.
   return (
@@ -548,7 +555,7 @@ function Card({
           🗣️ {t.vendorAnswered} {ANSWER_ICON[answer]} {t.answer[answer]}
         </p>
       )}
-      {hasAllergy && <p className="mt-2 text-sm font-bold text-red-800">⚠️ {t.confirmVendor}</p>}
+      {hasAllergy && it.verdict !== "avoid" && <p className="mt-2 text-sm font-bold text-red-800">⚠️ {t.confirmVendor}</p>}
       {showVendor && (
         <button onClick={onVendor} className={`${bigBtn} mt-2 min-h-12 bg-neutral-900 py-2 text-base text-white`}>
           🗣️ {answer ? t.askAgain : t.showVendor}
