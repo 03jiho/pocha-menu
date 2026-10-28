@@ -114,7 +114,7 @@ const RESTRICTION_DESC: Record<Restriction, string> = {
   egg: "egg — ALLERGY (달걀)",
   dairy: "dairy — ALLERGY (milk, cheese, butter)",
   wheat: "wheat/gluten — ALLERGY (flour, soy sauce, gochujang, batter)",
-  nuts: "peanuts and tree nuts — ALLERGY (땅콩, chestnut 밤, pine nut 잣, walnut 호두, almond…)",
+  nuts: "peanuts and tree nuts — ALLERGY (땅콩, chestnut 밤, pine nut 잣, walnut 호두, almond…). Chestnuts ARE tree nuts: 군밤 (roasted chestnuts) is always \"avoid\" for this restriction",
   soy: "soy — ALLERGY (soy sauce 간장, doenjang, gochujang, tofu)",
   sesame: "sesame — ALLERGY (sesame seeds 참깨, sesame oil 참기름, sesame topping)",
   buckwheat: "buckwheat — ALLERGY (메밀: 메밀전병, 막국수)",

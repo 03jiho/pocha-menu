@@ -94,7 +94,8 @@ export async function POST(req: Request) {
       const status = err instanceof ApiError ? err.status : undefined;
       console.error(`analyze attempt ${attempt} (${model}): ${e.name} ${status ?? ""}`);
       if (e.name === "TimeoutError" || e.name === "AbortError") timedOut = true;
-      if (status === 429) return fail("rate_limited", 429);
+      // Free-tier quotas are per model, so a 429 on the main model still tries the fallback model.
+      if (status === 429 && attempt === 2) return fail("rate_limited", 429);
       if (status === 503 && attempt === 2) return fail("busy", 503); // Gemini "high demand"
       if (status === 401 || status === 403) return fail("server_misconfigured", 500);
       if (status === 400 && attempt === 2) break; // includes an invalid key; a model-specific 400 on attempt 1 still tries the fallback
