@@ -1,6 +1,10 @@
 import type { Lang, Mode, Restriction } from "./schema";
 
-const COMMON_RULES = `공통 규칙:
+const COMMON_RULES = `가장 중요한 언어 규칙:
+- name, about, reason, notes, ask_all, ask_about[].local, 재료의 괄호 앞 부분은 반드시 지정된 사용자 언어로만 쓴다. 사용자 언어가 영어가 아니면 영어 문장을 쓰지 않는다. 이 필드들에는 한글을 한 글자도 섞지 않는다(한글은 name_ko, ask_about[].ko, ask_all_ko, other_ko, 재료의 괄호 안에만).
+- "인증/認証/认证/certified/شهادة" 같은 단어는 부정문으로도 쓰지 않는다. 할랄 도축 여부는 "알 수 없다"고만 쓴다.
+
+공통 규칙:
 - 할랄/비건 "인증", "안전합니다", "safe", "certified" 같은 표현은 어느 언어로도 절대 쓰지 않는다. "보통 ~가 들어갑니다", "~로 추정됩니다"(usually contains / likely) 같은 표현만 쓴다.
 - verdict는 선택된 기준 전체를 합쳐 가장 조심스러운 쪽으로 정한다(avoid > ask > ok).
 - 갑각류/견과류/달걀 같은 알레르기 기준은 특히 보수적으로 판단한다. 알레르기 기준이 선택된 상태에서 "ok"를 낼 때는 reason에 "교차오염이 없다고 단정할 수 없다"(영어라면 "Cross-contamination cannot be ruled out.")는 뜻의 자연스러운 문장을 사용자 언어로 넣는다.

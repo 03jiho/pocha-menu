@@ -2,6 +2,7 @@ import { ApiError } from "@google/genai";
 import { RESULT_JSON_SCHEMA, RequestSchema, ResultSchema, type Restriction } from "@/lib/schema";
 import { SYSTEM_PROMPTS, userPrompt } from "@/lib/prompt";
 import { GEMINI_FALLBACK_MODEL, GEMINI_MODEL, generateJson } from "@/lib/gemini";
+import { wrongLanguage } from "@/lib/lang-check";
 import { sampleResult } from "@/lib/sample";
 
 export const maxDuration = 60;
@@ -59,26 +60,39 @@ export async function POST(req: Request) {
 
   const deadline = Date.now() + BUDGET_MS;
   let timedOut = false;
+  // Attempt 2 goes to the fast fallback model after an API failure, but stays on the main model after a
+  // wrong-language answer (the lite model is weaker at following the language).
+  let nextModel = GEMINI_MODEL;
   for (let attempt = 1; attempt <= 2; attempt++) {
     const left = deadline - Date.now();
     if (left < 10_000) break;
+    const model = nextModel;
+    nextModel = GEMINI_FALLBACK_MODEL;
     try {
-      // Attempt 1: main model, capped so the fast fallback model still gets ~20s for attempt 2.
+      // Attempt 1 is capped so a retry still gets ~20s.
       const json = await generateJson(
         SYSTEM_PROMPTS[mode],
         [{ inlineData: { mimeType: mediaType, data: image } }, { text: userPrompt(restrictions, lang, other) }],
         RESULT_JSON_SCHEMA,
         attempt === 1 ? Math.min(left, 35_000) : left,
-        attempt === 1 ? GEMINI_MODEL : GEMINI_FALLBACK_MODEL,
+        model,
       );
       const parsed = ResultSchema.safeParse(json);
-      if (parsed.success) return Response.json(parsed.data);
+      if (parsed.success) {
+        // Wrong script for the user's language: retry once; on the last attempt, a readable answer beats an error.
+        if (attempt === 1 && wrongLanguage(parsed.data, lang)) {
+          console.error(`analyze attempt 1 (${model}): wrong language for ${lang}`);
+          nextModel = GEMINI_MODEL;
+          continue;
+        }
+        return Response.json(parsed.data);
+      }
       console.error(`analyze attempt ${attempt}: schema mismatch`);
     } catch (err) {
       // Log class/status only: never the image or the key.
       const e = err as Error;
       const status = err instanceof ApiError ? err.status : undefined;
-      console.error(`analyze attempt ${attempt} (${attempt === 1 ? GEMINI_MODEL : GEMINI_FALLBACK_MODEL}): ${e.name} ${status ?? ""}`);
+      console.error(`analyze attempt ${attempt} (${model}): ${e.name} ${status ?? ""}`);
       if (e.name === "TimeoutError" || e.name === "AbortError") timedOut = true;
       if (status === 429) return fail("rate_limited", 429);
       if (status === 503 && attempt === 2) return fail("busy", 503); // Gemini "high demand"
