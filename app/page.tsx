@@ -29,7 +29,14 @@ type State =
   | { kind: "done"; result: AnalyzeResult; run: Run }
   | { kind: "error"; code: ErrorCode; detail?: string };
 // What the vendor screen shows: a Korean question (+ its translation), or just the diet card.
-type VendorAsk = { title?: string; ko: string; local?: string; restrictions: Restriction[]; answerable: boolean };
+type VendorAsk = {
+  title?: string;
+  ko: string;
+  local?: string;
+  restrictions: Restriction[];
+  answerable: boolean;
+  onAnswer?: (a: Answer) => void; // lets the result card remember what the vendor said
+};
 
 const VERDICT_STYLE: Record<Verdict, string> = {
   ok: "bg-green-700 text-white",
@@ -312,6 +319,7 @@ function Results({
 }) {
   const [filter, setFilter] = useState<Verdict | "all">("all");
   const [riskFirst, setRiskFirst] = useState(true);
+  const [answers, setAnswers] = useState<Record<number, Answer>>({}); // vendor answers, by item index
   const hasAllergy = run.restrictions.some((r) => ALLERGY.includes(r));
   const count = (v: Verdict) => result.items.filter((i) => i.verdict === v).length;
 
@@ -383,7 +391,7 @@ function Results({
         ⇅ {riskFirst ? t.sortRisk : t.sortMenu}
       </button>
 
-      <ul className="mt-2 grid gap-4">
+      <ul className="mt-2 grid gap-3">
         {shown.map(({ it, i }) => (
           <Card
             key={i}
@@ -391,6 +399,7 @@ function Results({
             it={it}
             mode={run.mode}
             hasAllergy={hasAllergy}
+            answer={answers[i]}
             onVendor={() =>
               onVendor({
                 title: it.name_ko,
@@ -398,6 +407,7 @@ function Results({
                 local: t.askLocal(it.name, it.ask_about.map((a) => a.local)),
                 restrictions: run.restrictions,
                 answerable: true,
+                onAnswer: (a) => setAnswers((s) => ({ ...s, [i]: a })),
               })
             }
           />
@@ -421,60 +431,77 @@ function Card({
   it,
   mode,
   hasAllergy,
+  answer,
   onVendor,
 }: {
   t: Strings;
   it: Item;
   mode: Mode;
   hasAllergy: boolean;
+  answer?: Answer;
   onVendor: () => void;
 }) {
   const showVendor = it.verdict !== "ok" || it.confidence === "low" || hasAllergy;
+  // Compact by default (a 15-item menu must stay scannable): name, verdict, reason, flagged ingredients.
+  // Everything else sits behind a native <details>.
   return (
-    <li className="rounded-2xl border-2 border-neutral-300 p-4">
+    <li className="rounded-2xl border-2 border-neutral-300 p-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-2xl font-bold" lang="ko">
+          <p className="text-xl font-bold" lang="ko">
             {it.name_ko}
           </p>
-          <p className="text-neutral-700">{it.name}</p>
+          <p className="text-sm text-neutral-700">{it.name}</p>
         </div>
         <span className={`shrink-0 rounded-full px-3 py-1 text-base font-bold ${VERDICT_STYLE[it.verdict]}`}>
           {VERDICT_ICON[it.verdict]} {t.verdict[it.verdict]}
         </span>
       </div>
-      <p className="mt-2 text-sm text-neutral-700">
-        {t.confidence}: <strong>{t.confidenceLevel[it.confidence]}</strong>
-      </p>
-      <p className="mt-2">{it.reason}</p>
-
-      <p className="mt-3 text-sm font-semibold">{mode === "label" ? t.labelIngredients : t.likelyIngredients}</p>
-      <ul className="mt-1 flex flex-wrap gap-1">
-        {it.likely_ingredients.map((ing, j) => {
-          const hit = it.flagged_ingredients.includes(ing);
-          return (
-            <li
-              key={j}
-              className={`rounded-full px-2 py-0.5 text-sm ${hit ? "bg-red-700 font-bold text-white" : "bg-neutral-100"}`}
-            >
-              {hit ? "⚠ " : ""}
-              {ing}
+      <p className="mt-2 text-base">{it.reason}</p>
+      {it.flagged_ingredients.length > 0 && (
+        <ul className="mt-2 flex flex-wrap gap-1">
+          {it.flagged_ingredients.map((ing, j) => (
+            <li key={j} className="rounded-full bg-red-700 px-2 py-0.5 text-sm font-bold text-white">
+              ⚠ {ing}
             </li>
-          );
-        })}
-      </ul>
-      {it.triggered_restrictions.length > 0 && (
-        <p className="mt-2 text-sm">
-          <span className="font-semibold">{t.flagged}: </span>
-          {it.triggered_restrictions.map((r) => t.restrictions[r]).join(", ")}
+          ))}
+        </ul>
+      )}
+      {answer && (
+        <p className={`mt-2 rounded-xl px-3 py-2 text-sm font-bold ${ANSWER_STYLE[answer]}`}>
+          🗣️ {t.vendorAnswered} {ANSWER_ICON[answer]} {t.answer[answer]}
         </p>
       )}
       {hasAllergy && <p className="mt-2 text-sm font-bold text-red-800">⚠️ {t.confirmVendor}</p>}
       {showVendor && (
-        <button onClick={onVendor} className={`${bigBtn} mt-3 bg-neutral-900 text-white`}>
-          🗣️ {t.showVendor}
+        <button onClick={onVendor} className={`${bigBtn} mt-2 min-h-12 bg-neutral-900 py-2 text-base text-white`}>
+          🗣️ {answer ? t.askAgain : t.showVendor}
         </button>
       )}
+      <details className="mt-2 text-sm">
+        <summary className="min-h-11 cursor-pointer py-2 font-semibold text-neutral-700">{t.details}</summary>
+        <p className="text-neutral-700">
+          {t.confidence}: <strong>{t.confidenceLevel[it.confidence]}</strong>
+        </p>
+        <p className="mt-2 font-semibold">{mode === "label" ? t.labelIngredients : t.likelyIngredients}</p>
+        <ul className="mt-1 flex flex-wrap gap-1">
+          {it.likely_ingredients.map((ing, j) => {
+            const hit = it.flagged_ingredients.includes(ing);
+            return (
+              <li key={j} className={`rounded-full px-2 py-0.5 ${hit ? "bg-red-700 font-bold text-white" : "bg-neutral-100"}`}>
+                {hit ? "⚠ " : ""}
+                {ing}
+              </li>
+            );
+          })}
+        </ul>
+        {it.triggered_restrictions.length > 0 && (
+          <p className="mt-2">
+            <span className="font-semibold">{t.flagged}: </span>
+            {it.triggered_restrictions.map((r) => t.restrictions[r]).join(", ")}
+          </p>
+        )}
+      </details>
     </li>
   );
 }
@@ -523,16 +550,27 @@ function VendorScreen({ t, ask, onClose }: { t: Strings; ask: VendorAsk; onClose
                   {ask.restrictions.map((r) => (
                     <li key={r}>• {VENDOR_KO.statements[r]}</li>
                   ))}
+                  {ask.restrictions.some((r) => ALLERGY.includes(r)) && (
+                    <li className="font-bold text-red-800">⚠️ {VENDOR_KO.severe}</li>
+                  )}
                 </ul>
               )}
               {ask.title && <p className="mt-6 text-2xl font-semibold text-neutral-700">{ask.title}</p>}
               <p className="mt-2 text-4xl font-bold leading-tight break-keep">{ask.ko}</p>
+              {!ask.answerable && <p className="mt-6 text-xl font-semibold text-neutral-800">{VENDOR_KO.pleasePoint}</p>}
               {ask.answerable && (
                 <>
                   <p className="mt-6 text-lg text-neutral-700">{VENDOR_KO.pleaseAnswer}</p>
                   <div className="mt-2 grid gap-2">
                     {(["yes", "no", "unsure"] as const).map((a) => (
-                      <button key={a} onClick={() => setAnswer(a)} className={`${bigBtn} text-2xl ${ANSWER_STYLE[a]}`}>
+                      <button
+                        key={a}
+                        onClick={() => {
+                          setAnswer(a);
+                          ask.onAnswer?.(a);
+                        }}
+                        className={`${bigBtn} text-2xl ${ANSWER_STYLE[a]}`}
+                      >
                         {VENDOR_KO.answer[a]}
                       </button>
                     ))}
