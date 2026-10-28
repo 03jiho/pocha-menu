@@ -90,11 +90,13 @@ const LANG_NAME: Record<Lang, string> = {
 };
 
 // Per-language example so the model doesn't copy an English sample into a Japanese answer.
+// Includes the words that come up most at festival stalls; the model otherwise tends to slip Hangul into them
+// (seen live: "ニンニ크" for ニンニク), since the rest of the prompt is Korean.
 const LANG_EXAMPLE: Record<Lang, string> = {
-  en: 'name "Fish cake skewer"; ingredients "egg (달걀)", "anchovy broth (멸치 육수)"',
-  ja: 'name "おでん串"; ingredients "卵 (달걀)", "煮干しだし (멸치 육수)"',
-  zh: 'name "鱼饼串"; ingredients "鸡蛋 (달걀)", "鳀鱼高汤 (멸치 육수)"',
-  ar: 'name "أسياخ كعك السمك"; ingredients "بيض (달걀)", "مرق الأنشوفة (멸치 육수)"',
+  en: 'name "Fish cake skewer"; ingredients "egg (달걀)", "anchovy broth (멸치 육수)", "garlic (마늘)", "shrimp (새우)", "peanuts (땅콩)", "pork (돼지고기)", "cooking wine (맛술)"',
+  ja: 'name "おでん串"; ingredients "卵 (달걀)", "煮干しだし (멸치 육수)", "ニンニク (마늘)", "エビ (새우)", "ピーナッツ (땅콩)", "豚肉 (돼지고기)", "料理酒 (맛술)"',
+  zh: 'name "鱼饼串"; ingredients "鸡蛋 (달걀)", "鳀鱼高汤 (멸치 육수)", "大蒜 (마늘)", "虾 (새우)", "花生 (땅콩)", "猪肉 (돼지고기)", "料酒 (맛술)"',
+  ar: 'name "أسياخ كعك السمك"; ingredients "بيض (달걀)", "مرق الأنشوفة (멸치 육수)", "ثوم (마늘)", "روبيان (새우)", "فول سوداني (땅콩)", "لحم خنزير (돼지고기)", "خمر الطبخ (맛술)"',
 };
 
 const RESTRICTION_DESC: Record<Restriction, string> = {
