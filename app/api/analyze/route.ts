@@ -3,6 +3,7 @@ import { RESULT_JSON_SCHEMA, RequestSchema, ResultSchema, type Restriction } fro
 import { SYSTEM_PROMPTS, userPrompt } from "@/lib/prompt";
 import { GEMINI_FALLBACK_MODEL, GEMINI_MODEL, generateJson } from "@/lib/gemini";
 import { wrongLanguage } from "@/lib/lang-check";
+import { repairAskAbout } from "@/lib/ask";
 import { sampleResult } from "@/lib/sample";
 
 export const maxDuration = 60;
@@ -85,6 +86,7 @@ export async function POST(req: Request) {
           nextModel = GEMINI_MODEL;
           continue;
         }
+        for (const it of parsed.data.items) it.ask_about = repairAskAbout(it.ask_about, it.likely_ingredients);
         return Response.json(parsed.data);
       }
       console.error(`analyze attempt ${attempt}: schema mismatch`);

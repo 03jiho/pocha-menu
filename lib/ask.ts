@@ -7,6 +7,23 @@ function josa(word: string, withBatchim: string, without: string) {
   return code >= 0 && code <= 11171 && code % 28 !== 0 ? withBatchim : without;
 }
 
+const HANGUL = /[가-힣]/;
+
+// The model sometimes puts the user-language word in ask_about.ko ("ニンニク" instead of "마늘"), which would show the
+// vendor a foreign word. Repair it from the ingredient list ("ニンニク (마늘)"), or drop it if there is no match.
+export function repairAskAbout<T extends { ko: string; local: string }>(asks: T[], ingredients: string[]) {
+  const koByLocal = new Map<string, string>();
+  for (const ing of ingredients) {
+    const m = ing.match(/^(.*?)\s*\(([^)]*)\)\s*$/);
+    if (m) koByLocal.set(m[1].trim(), m[2].trim());
+  }
+  return asks.flatMap((a) => {
+    if (HANGUL.test(a.ko)) return [a];
+    const ko = koByLocal.get(a.ko.trim()) ?? koByLocal.get(a.local.trim());
+    return ko && HANGUL.test(ko) ? [{ ...a, ko }] : [];
+  });
+}
+
 // Drops items that are the dish itself ("군밤" → "밤", "새우튀김" → "새우"): asking about them is pointless.
 export function askable<T extends { ko: string }>(menu: string, items: T[]) {
   const name = menu.replace(/\s/g, "");
