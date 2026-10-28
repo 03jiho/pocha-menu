@@ -12,6 +12,8 @@ import {
   DIETS,
   LANGS,
   MODES,
+  MORE_ALLERGIES,
+  OTHER_MAX,
   RESTRICTIONS,
   VERDICTS,
   type AnalyzeResult,
@@ -22,7 +24,8 @@ import {
   type Verdict,
 } from "@/lib/schema";
 
-type Run = { restrictions: Restriction[]; mode: Mode; sample: boolean };
+// other: the user's free-text restriction as shown to the vendor (Korean from the model when available).
+type Run = { restrictions: Restriction[]; mode: Mode; sample: boolean; other: string };
 type State =
   | { kind: "idle" }
   | { kind: "loading" }
@@ -34,9 +37,15 @@ type VendorAsk = {
   ko: string;
   local?: string;
   restrictions: Restriction[];
+  other?: string; // text for the "other" statement
   answerable: boolean;
   onAnswer?: (a: Answer) => void; // lets the result card remember what the vendor said
 };
+
+// Plain-Korean lines telling the vendor what the traveler can't eat (fixed text; works offline).
+function statementsKo(restrictions: Restriction[], other?: string) {
+  return restrictions.map((r) => (r === "other" ? `${VENDOR_KO.statements.other} ${other ?? ""}` : VENDOR_KO.statements[r]));
+}
 
 const VERDICT_STYLE: Record<Verdict, string> = {
   ok: "bg-green-700 text-white",
@@ -79,6 +88,9 @@ export default function Home() {
   const [lang, setLang] = useState<Lang>("en");
   const [mode, setMode] = useState<Mode>("menu");
   const [selected, setSelected] = useState<Restriction[]>([]);
+  const [other, setOther] = useState("");
+  const [otherKo, setOtherKo] = useState<{ text: string; ko: string } | null>(null);
+  const [emergency, setEmergency] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null); // base64 JPEG, kept only in memory for retry
   const [state, setState] = useState<State>({ kind: "idle" });
   const [vendor, setVendor] = useState<VendorAsk | null>(null);
@@ -92,8 +104,18 @@ export default function Home() {
     setLang(load("lang", isLang) ?? (isLang(browser) ? browser : "en"));
     setMode(load("mode", isMode) ?? "menu");
     setSelected(load("restrictions", isRestrictions) ?? []);
+    setOther(load("other", (v): v is string => typeof v === "string") ?? "");
+    setOtherKo(
+      load("other_ko", (v): v is { text: string; ko: string } =>
+        typeof v === "object" && v !== null && typeof (v as { ko?: unknown }).ko === "string",
+      ),
+    );
     setHydrated(true);
     /* eslint-enable react-hooks/set-state-in-effect */
+    // Offline shell for the diet/emergency cards. Production only: in dev it would cache hot-reloaded code.
+    if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
   }, []);
 
   useEffect(() => {
@@ -103,16 +125,21 @@ export default function Home() {
     save("lang", lang);
     save("mode", mode);
     save("restrictions", selected);
-  }, [lang, mode, selected, hydrated]);
+    save("other", other);
+  }, [lang, mode, selected, other, hydrated]);
+
+  const otherText = other.trim();
+  const withOther = otherText ? [...selected, "other" as const] : selected;
+  // Korean for the vendor when we have it from an earlier analysis of the same text; else the user's own words.
+  const otherForVendor = otherKo?.text === otherText ? otherKo.ko : otherText;
 
   async function analyze(image: string) {
-    const run: Run = { restrictions: selected, mode, sample: false };
     setState({ kind: "loading" });
     try {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image, mediaType: "image/jpeg", restrictions: selected, lang, mode }),
+        body: JSON.stringify({ image, mediaType: "image/jpeg", restrictions: withOther, other: otherText, lang, mode }),
         signal: AbortSignal.timeout(70_000),
       });
       const data = await res.json().catch(() => null);
@@ -123,6 +150,12 @@ export default function Home() {
       const result = data as AnalyzeResult;
       if (!result.readable || !result.items.length) {
         return setState({ kind: "error", code: "unreadable", detail: result.notes });
+      }
+      const run: Run = { restrictions: withOther, mode, sample: false, other: result.other_ko || otherText };
+      // Remember the Korean wording so the offline diet/emergency cards can show it too.
+      if (otherText && result.other_ko) {
+        setOtherKo({ text: otherText, ko: result.other_ko });
+        save("other_ko", { text: otherText, ko: result.other_ko });
       }
       setState({ kind: "done", result, run });
       window.scrollTo(0, 0);
@@ -146,15 +179,19 @@ export default function Home() {
 
   function trySample() {
     setPhoto(null);
-    setState({ kind: "done", result: SAMPLE_RESULT, run: { restrictions: SAMPLE_RESTRICTIONS, mode: "menu", sample: true } });
+    setState({
+      kind: "done",
+      result: SAMPLE_RESULT,
+      run: { restrictions: SAMPLE_RESTRICTIONS, mode: "menu", sample: true, other: "" },
+    });
     window.scrollTo(0, 0);
   }
 
   const showDietCard = () =>
-    setVendor({ ko: VENDOR_KO.dietCardAsk, local: t.dietCardAsk, restrictions: selected, answerable: true });
+    setVendor({ ko: VENDOR_KO.dietCardAsk, local: t.dietCardAsk, restrictions: withOther, other: otherForVendor, answerable: true });
   const toggle = (r: Restriction) =>
     setSelected((s) => (s.includes(r) ? s.filter((x) => x !== r) : [...s, r]));
-  const ready = selected.length > 0;
+  const ready = withOther.length > 0;
 
   const chips = (group: readonly Restriction[]) => (
     <div className="mt-1 flex flex-wrap gap-2">
@@ -180,7 +217,14 @@ export default function Home() {
   return (
     <main className="mx-auto w-full max-w-md px-4 pb-16 pt-4">
       <header className="flex items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold">{t.title}</h1>
+        <h1 className="text-xl font-bold">{t.title}</h1>
+        <button
+          onClick={() => setEmergency(true)}
+          aria-label={t.emergency}
+          className="ms-auto min-h-11 shrink-0 rounded-lg bg-red-700 px-3 text-sm font-bold text-white"
+        >
+          🚨 SOS
+        </button>
         <select
           aria-label="Language"
           value={lang}
@@ -242,6 +286,21 @@ export default function Home() {
             {chips(DIETS)}
             <p className="mt-2 text-sm font-semibold text-neutral-600">{t.groupAllergy}</p>
             {chips(ALLERGIES)}
+            <details className="mt-1" open={MORE_ALLERGIES.some((r) => selected.includes(r)) || !!otherText}>
+              <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-neutral-700">
+                {t.moreAllergies}
+              </summary>
+              {chips(MORE_ALLERGIES)}
+              <label className="mt-2 block text-sm font-semibold text-neutral-600">
+                {t.otherLabel}
+                <input
+                  value={other}
+                  onChange={(e) => setOther(e.target.value.slice(0, OTHER_MAX))}
+                  placeholder={t.otherPlaceholder}
+                  className="mt-1 block min-h-11 w-full rounded-xl border-2 border-neutral-300 px-3 text-base font-normal"
+                />
+              </label>
+            </details>
             {ready && <p className="mt-1 text-xs text-neutral-600">💾 {t.saved}</p>}
           </fieldset>
 
@@ -273,11 +332,20 @@ export default function Home() {
             )}
             <p className="text-sm text-neutral-700">📸 {t.uploadHint[mode]}</p>
             <p className="text-sm text-neutral-700">🔒 {t.privacy}</p>
+            <p className="text-sm text-neutral-700">📲 {t.offlineHint}</p>
           </section>
         </>
       )}
 
       {vendor && <VendorScreen t={t} ask={vendor} onClose={() => setVendor(null)} />}
+      {emergency && (
+        <EmergencyScreen
+          t={t}
+          allergies={withOther.filter((r) => ALLERGY.includes(r) || r === "other")}
+          other={otherForVendor}
+          onClose={() => setEmergency(false)}
+        />
+      )}
     </main>
   );
 }
@@ -367,7 +435,13 @@ function Results({
       {result.ask_all_ko && run.mode === "menu" && (
         <button
           onClick={() =>
-            onVendor({ ko: result.ask_all_ko, local: result.ask_all, restrictions: run.restrictions, answerable: false })
+            onVendor({
+              ko: result.ask_all_ko,
+              local: result.ask_all,
+              restrictions: run.restrictions,
+              other: run.other,
+              answerable: false,
+            })
           }
           className={`${bigBtn} mt-3 bg-neutral-900 text-white`}
         >
@@ -406,6 +480,7 @@ function Results({
                 ko: askKo(it.name_ko, it.ask_about.map((a) => a.ko)),
                 local: t.askLocal(it.name, it.ask_about.map((a) => a.local)),
                 restrictions: run.restrictions,
+                other: run.other,
                 answerable: true,
                 onAnswer: (a) => setAnswers((s) => ({ ...s, [i]: a })),
               })
@@ -457,6 +532,7 @@ function Card({
           {VERDICT_ICON[it.verdict]} {t.verdict[it.verdict]}
         </span>
       </div>
+      {it.about && <p className="mt-1 text-sm text-neutral-600">{it.about}</p>}
       <p className="mt-2 text-base">{it.reason}</p>
       {it.flagged_ingredients.length > 0 && (
         <ul className="mt-2 flex flex-wrap gap-1">
@@ -547,8 +623,8 @@ function VendorScreen({ t, ask, onClose }: { t: Strings; ask: VendorAsk; onClose
               <p className="text-xl font-semibold">{VENDOR_KO.greeting}</p>
               {ask.restrictions.length > 0 && (
                 <ul className="mt-3 grid gap-1 text-xl">
-                  {ask.restrictions.map((r) => (
-                    <li key={r}>• {VENDOR_KO.statements[r]}</li>
+                  {statementsKo(ask.restrictions, ask.other).map((s, i) => (
+                    <li key={i}>• {s}</li>
                   ))}
                   {ask.restrictions.some((r) => ALLERGY.includes(r)) && (
                     <li className="font-bold text-red-800">⚠️ {VENDOR_KO.severe}</li>
@@ -585,6 +661,60 @@ function VendorScreen({ t, ask, onClose }: { t: Strings; ask: VendorAsk; onClose
             )}
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Allergy emergency card (like Equal Eats' emergency card): fixed Korean text, works offline, one tap to call 119.
+function EmergencyScreen({
+  t,
+  allergies,
+  other,
+  onClose,
+}: {
+  t: Strings;
+  allergies: Restriction[];
+  other: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 overflow-y-auto bg-red-700 text-white">
+      <div className="mx-auto flex min-h-full max-w-xl flex-col p-5">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm">{t.emergencyLead}</p>
+          <button autoFocus onClick={onClose} className="min-h-12 shrink-0 rounded-xl bg-white px-4 text-lg font-semibold text-black">
+            ✕ {t.close}
+          </button>
+        </div>
+        <div className="mt-6 flex-1" lang="ko" dir="ltr">
+          <p className="text-4xl font-bold leading-tight break-keep">{VENDOR_KO.emergencyTitle}</p>
+          <ul className="mt-6 grid gap-3 text-2xl font-semibold break-keep">
+            {VENDOR_KO.emergencyLines.map((l) => (
+              <li key={l}>• {l}</li>
+            ))}
+          </ul>
+          {allergies.length > 0 && (
+            <div className="mt-6 rounded-2xl bg-white p-4 text-xl text-black">
+              <p className="font-bold">{VENDOR_KO.emergencyMine}</p>
+              <ul className="mt-2 grid gap-1">
+                {statementsKo(allergies, other).map((s, i) => (
+                  <li key={i}>• {s}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+        <a href="tel:119" className={`${bigBtn} mt-6 bg-white text-2xl font-bold text-red-700`}>
+          📞 {t.call119}
+        </a>
+        <p className="mt-2 text-center text-sm">{t.emergencyNote}</p>
       </div>
     </div>
   );

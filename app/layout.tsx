@@ -4,6 +4,8 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Pocha Menu Check",
   description: "Snap a Korean street-food menu board and see which dishes likely fit your diet.",
+  icons: { apple: "/icon-192.png" },
+  appleWebApp: { capable: true, title: "Pocha Check" },
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#ffffff" };

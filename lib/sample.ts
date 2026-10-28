@@ -10,6 +10,7 @@ export const SAMPLE_RESULT: AnalyzeResult = {
     {
       name_ko: "어묵",
       name: "Fish cake skewer",
+      about: "Thin sheets of fish cake folded onto a skewer and kept warm in hot broth; you can sip the broth too.",
       likely_ingredients: ["fish paste (생선살)", "wheat flour (밀가루)", "anchovy broth (멸치 육수)", "radish (무)", "soy sauce (간장)"],
       flagged_ingredients: [],
       verdict: "ask",
@@ -21,6 +22,7 @@ export const SAMPLE_RESULT: AnalyzeResult = {
     {
       name_ko: "떡볶이",
       name: "Spicy rice cakes",
+      about: "Chewy cylinder rice cakes simmered in a sweet-and-spicy red chili sauce, eaten with a toothpick.",
       likely_ingredients: ["rice cakes (떡)", "red chili paste (고추장)", "fish cake (어묵)", "anchovy broth (멸치 육수)", "sugar (설탕)", "green onion (대파)"],
       flagged_ingredients: [],
       verdict: "ask",
@@ -32,6 +34,7 @@ export const SAMPLE_RESULT: AnalyzeResult = {
     {
       name_ko: "순대",
       name: "Korean blood sausage",
+      about: "Steamed sausage filled with glass noodles and blood, sliced and dipped in salt or salted shrimp.",
       likely_ingredients: ["pork intestine (돼지 창자)", "pork blood (돼지 피)", "glass noodles (당면)", "sticky rice (찹쌀)", "salted shrimp (새우젓)"],
       flagged_ingredients: ["pork intestine (돼지 창자)", "pork blood (돼지 피)", "salted shrimp (새우젓)"],
       verdict: "avoid",
@@ -43,6 +46,7 @@ export const SAMPLE_RESULT: AnalyzeResult = {
     {
       name_ko: "새우튀김",
       name: "Fried shrimp",
+      about: "Whole shrimp in crispy batter, often sold with other fried snacks and dipped in soy sauce.",
       likely_ingredients: ["shrimp (새우)", "wheat flour (밀가루)", "egg (달걀)", "cooking oil (식용유)"],
       flagged_ingredients: ["shrimp (새우)"],
       verdict: "avoid",
@@ -54,6 +58,7 @@ export const SAMPLE_RESULT: AnalyzeResult = {
     {
       name_ko: "씨앗호떡",
       name: "Seed-filled sweet pancake",
+      about: "A hot griddled pancake filled with melted brown sugar and seeds; eaten folded in a paper cup.",
       likely_ingredients: ["wheat flour (밀가루)", "brown sugar (흑설탕)", "peanuts (땅콩)", "sunflower seeds (해바라기씨)", "cooking oil (식용유)"],
       flagged_ingredients: [],
       verdict: "ask",
@@ -65,6 +70,7 @@ export const SAMPLE_RESULT: AnalyzeResult = {
     {
       name_ko: "군고구마",
       name: "Roasted sweet potato",
+      about: "A whole sweet potato slow-roasted in a drum oven, sold hot in a paper bag.",
       likely_ingredients: ["sweet potato (고구마)"],
       flagged_ingredients: [],
       verdict: "ok",
@@ -76,6 +82,7 @@ export const SAMPLE_RESULT: AnalyzeResult = {
   ],
   ask_all_ko: "돼지고기, 술, 새우·게가 안 들어간 메뉴가 뭐예요?",
   ask_all: "Which items have no pork, alcohol, shrimp or crab?",
+  other_ko: "",
   notes: "Sample menu (no photo was sent). Recipes vary by stall.",
   label_contains: "",
   label_facility: "",

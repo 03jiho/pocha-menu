@@ -1,5 +1,5 @@
 import { ApiError } from "@google/genai";
-import { RESULT_JSON_SCHEMA, RequestSchema, ResultSchema } from "@/lib/schema";
+import { RESULT_JSON_SCHEMA, RequestSchema, ResultSchema, type Restriction } from "@/lib/schema";
 import { SYSTEM_PROMPTS, userPrompt } from "@/lib/prompt";
 import { GEMINI_FALLBACK_MODEL, GEMINI_MODEL, generateJson } from "@/lib/gemini";
 import { SAMPLE_RESULT } from "@/lib/sample";
@@ -36,7 +36,13 @@ export async function POST(req: Request) {
 
   const body = RequestSchema.safeParse(await req.json().catch(() => null));
   if (!body.success) return fail("bad_request", 400);
-  const { image, mediaType, restrictions, lang, mode } = body.data;
+  const { image, mediaType, lang, mode, other } = body.data;
+  // "other" is only meaningful with text; keep the id list and the text in sync.
+  const restrictions: Restriction[] = [
+    ...body.data.restrictions.filter((r) => r !== "other"),
+    ...(other ? (["other"] as const) : []),
+  ];
+  if (!restrictions.length) return fail("bad_request", 400);
 
   const buf = Buffer.from(image, "base64");
   if (buf.length > MAX_IMAGE_BYTES) return fail("too_large", 413);
@@ -60,7 +66,7 @@ export async function POST(req: Request) {
       // Attempt 1: main model, capped so the fast fallback model still gets ~20s for attempt 2.
       const json = await generateJson(
         SYSTEM_PROMPTS[mode],
-        [{ inlineData: { mimeType: mediaType, data: image } }, { text: userPrompt(restrictions, lang) }],
+        [{ inlineData: { mimeType: mediaType, data: image } }, { text: userPrompt(restrictions, lang, other) }],
         RESULT_JSON_SCHEMA,
         attempt === 1 ? Math.min(left, 35_000) : left,
         attempt === 1 ? GEMINI_MODEL : GEMINI_FALLBACK_MODEL,

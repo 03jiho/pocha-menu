@@ -1,13 +1,18 @@
 import { z } from "zod";
 
-// Shown in two groups on the first screen; order here is display order.
+// Shown in groups on the first screen; order here is display order.
 export const DIETS = ["halal", "vegetarian", "vegan", "pork", "beef"] as const;
-export const ALLERGIES = ["crustacean", "fish", "egg", "dairy", "wheat", "nuts", "soy", "sesame"] as const;
-export const RESTRICTIONS = [...DIETS, ...ALLERGIES] as const;
+export const ALLERGIES = ["crustacean", "mollusk", "fish", "egg", "dairy", "wheat", "nuts", "soy", "sesame"] as const;
+// Rarer items from Korea's mandatory allergen labeling list; collapsed under "More" so the first screen still fits.
+export const MORE_ALLERGIES = ["buckwheat", "peach", "tomato", "sulfites"] as const;
+// "other" = the user's own free-text restriction (never a chip; added when the text box is filled).
+export const RESTRICTIONS = [...DIETS, ...ALLERGIES, ...MORE_ALLERGIES, "other"] as const;
 export type Restriction = (typeof RESTRICTIONS)[number];
 
 // Allergy criteria: every card says "Always confirm with the vendor" (cross-contamination is never knowable from a photo).
-export const ALLERGY: readonly Restriction[] = ALLERGIES;
+export const ALLERGY: readonly Restriction[] = [...ALLERGIES, ...MORE_ALLERGIES];
+
+export const OTHER_MAX = 60;
 
 export const LANGS = ["en", "ja", "zh", "ar"] as const;
 export type Lang = (typeof LANGS)[number];
@@ -21,6 +26,7 @@ export type Verdict = (typeof VERDICTS)[number];
 export const ItemSchema = z.object({
   name_ko: z.string(),
   name: z.string(), // in the user's language
+  about: z.string(), // one short sentence in the user's language: what this dish is
   likely_ingredients: z.array(z.string()), // "user-language (한국어)", e.g. "egg (달걀)"
   flagged_ingredients: z.array(z.string()), // exact subset of likely_ingredients that hit a selected restriction
   verdict: z.enum(VERDICTS),
@@ -37,6 +43,7 @@ export const ResultSchema = z.object({
   items: z.array(ItemSchema),
   ask_all_ko: z.string(), // one Korean question covering the whole menu
   ask_all: z.string(), // the same question in the user's language
+  other_ko: z.string(), // the user's free-text restriction as a short polite Korean sentence; "" if none
   notes: z.string(), // general note, or why it was unreadable; "" if none
   label_contains: z.string(), // label mode: allergen statement as printed ("…함유"); "" otherwise
   label_facility: z.string(), // label mode: shared-facility statement as printed; "" otherwise
@@ -55,6 +62,7 @@ export const RequestSchema = z.object({
   image: z.string().min(1), // base64, no data: prefix
   mediaType: z.enum(MEDIA_TYPES),
   restrictions: z.array(z.enum(RESTRICTIONS)).min(1).max(RESTRICTIONS.length),
+  other: z.string().trim().max(OTHER_MAX).default(""),
   lang: z.enum(LANGS).default("en"),
   mode: z.enum(MODES).default("menu"),
 });
