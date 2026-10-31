@@ -8,6 +8,7 @@ const NEEDS: Record<Lang, RegExp | null> = {
   en: null,
   ja: /[぀-ヿ一-鿿]/, // kana or kanji
   zh: /[一-鿿]/, // Han
+  "zh-TW": /[一-鿿]/,
   ar: /[؀-ۿ]/, // Arabic
 };
 const beforeParens = (s: string) => s.replace(/\s*\([^)]*\)\s*$/, "");

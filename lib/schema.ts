@@ -14,7 +14,7 @@ export const ALLERGY: readonly Restriction[] = [...ALLERGIES, ...MORE_ALLERGIES]
 
 export const OTHER_MAX = 60;
 
-export const LANGS = ["en", "ja", "zh", "ar"] as const;
+export const LANGS = ["en", "ja", "zh", "zh-TW", "ar"] as const;
 export type Lang = (typeof LANGS)[number];
 
 export const MODES = ["menu", "label"] as const;
