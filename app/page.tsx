@@ -47,21 +47,65 @@ function statementsKo(restrictions: Restriction[], other?: string) {
   return restrictions.map((r) => (r === "other" ? `${VENDOR_KO.statements.other} ${other ?? ""}` : VENDOR_KO.statements[r]));
 }
 
-// Reads Korean aloud with the browser's built-in voice: festivals are noisy and small screens are hard to read.
+// Reads Korean aloud (festivals are noisy and small screens are hard to read): a natural ElevenLabs voice via
+// /api/tts, falling back to the browser's built-in voice when offline, unconfigured, slow or failing.
 const canSpeak = () => typeof window !== "undefined" && "speechSynthesis" in window;
-function speakKo(lines: string[]) {
+const SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+const ttsCache = new Map<string, string>(); // text → blob URL: repeat taps cost no credits
+let player: HTMLAudioElement | null = null;
+let speakId = 0;
+
+function stopSpeaking() {
+  speakId++;
+  player?.pause();
+  if (canSpeak()) speechSynthesis.cancel();
+}
+
+function speakBrowser(text: string) {
   if (!canSpeak()) return;
-  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "ko-KR";
+  u.rate = 0.9;
+  speechSynthesis.speak(u);
+}
+
+function speakKo(lines: string[]) {
+  stopSpeaking();
+  const id = speakId;
   // End every line with punctuation so the voice pauses between them.
   const text = lines
     .map((l) => l.trim())
     .filter(Boolean)
     .map((l) => (/[.!?:]$/.test(l) ? l : `${l}.`))
     .join(" ");
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = "ko-KR";
-  u.rate = 0.9;
-  speechSynthesis.speak(u);
+  if (!navigator.onLine) return speakBrowser(text);
+
+  // iOS only plays sound started inside the tap: unlock both paths now, before the network wait.
+  player ??= new Audio();
+  player.src = SILENT_WAV;
+  player.play().catch(() => {});
+  if (canSpeak()) speechSynthesis.speak(new SpeechSynthesisUtterance(""));
+
+  const fallback = () => id === speakId && speakBrowser(text);
+  const cached = ttsCache.get(text);
+  const url = cached
+    ? Promise.resolve(cached)
+    : fetch("/api/tts", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text }),
+        signal: AbortSignal.timeout(6_000),
+      }).then(async (r) => {
+        if (!r.ok) throw new Error(`tts ${r.status}`);
+        const u = URL.createObjectURL(await r.blob());
+        ttsCache.set(text, u);
+        return u;
+      });
+  url.then((u) => {
+    if (id !== speakId || !player) return; // closed or tapped again meanwhile
+    player.src = u;
+    return player.play();
+  }).catch(fallback);
 }
 
 // Keeps the screen on while the phone is handed to the vendor (web pages can't raise brightness; this is the closest).
@@ -81,7 +125,7 @@ function useWakeLock() {
     return () => {
       closed = true;
       lock?.release().catch(() => {});
-      if (canSpeak()) speechSynthesis.cancel();
+      stopSpeaking();
     };
   }, []);
 }
